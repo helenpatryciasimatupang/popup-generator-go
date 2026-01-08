@@ -1,7 +1,6 @@
 // =====================================================
 // POP UP CSV GENERATOR
-// FINAL – CSV TEMPLATE AUTHORITATIVE
-// Jika data tidak ada di Master -> kosong
+// FINAL – ISI SAMA, URUTAN BEBAS
 // =====================================================
 
 const $ = (id) => document.getElementById(id);
@@ -10,13 +9,6 @@ const fileInput = $("file");
 const btn = $("btn");
 const statusEl = $("status");
 
-const cHome = $("cHome");
-const cHomeBiz = $("cHomeBiz");
-const cFdt = $("cFdt");
-const cFat = $("cFat");
-const cHook = $("cHook");
-const cPole = $("cPole");
-
 fileInput.addEventListener("change", () => {
   btn.disabled = !fileInput.files.length;
 });
@@ -24,47 +16,31 @@ fileInput.addEventListener("change", () => {
 const SEP = ";";
 const esc = (v) => `"${String(v ?? "").replace(/"/g, '""')}"`;
 
-// =====================================================
-// CSV TEMPLATE HEADERS (PERSIS CSV CONTOH)
-// =====================================================
+// ===== TEMPLATE HEADERS (PERSIS CSV SEHARUSNYA) =====
 const HOME_HEADERS = [
   "HOME_PASS_ID","ADDRESS","RT","RW","KELURAHAN","KECAMATAN","KABUPATEN",
   "PROVINSI","POSTAL_CODE","CLUSTER_NAME","ID_Area","LATITUDE","LONGITUDE",
   "FDT_CODE","FAT ID/NETWORK ID","Pole ID (New)","Clamp_Hook_ID",
   "HOME/HOME-BIZ"
 ];
-
 const FDT_HEADERS = ["FDT_CODE","CLUSTER_NAME","ID_Area"];
 const FAT_HEADERS = ["FAT_CODE","FDT_CODE","CLUSTER_NAME","ID_Area"];
-const HOOK_HEADERS = [
-  "Clamp_Hook_ID","Clamp_Hook_LATITUDE","Clamp_Hook_LONGITUDE",
-  "CLUSTER_NAME","ID_Area"
-];
 const POLE_HEADERS = [
   "Pole ID (New)","Coordinate (Lat) NEW","Coordinate (Long) NEW",
   "Pole Provider (New)","Pole Type","LINE","CLUSTER_NAME","ID_Area"
 ];
 
-// =====================================================
+// ===== CSV BUILDER =====
 function toCSV(headers, rows) {
   const out = [];
   out.push(headers.map(esc).join(SEP));
   rows.forEach(r => {
-    out.push(headers.map(h => esc(r[h])).join(SEP));
+    out.push(headers.map(h => esc(r[h] || "")).join(SEP));
   });
   return out.join("\n");
 }
 
-function uniqBy(rows, key) {
-  const map = {};
-  rows.forEach(r => {
-    const v = r[key];
-    if (v && v !== "-") map[v] = r;
-  });
-  return Object.values(map);
-}
-
-// =====================================================
+// ===== MAIN =====
 btn.addEventListener("click", async () => {
   const file = fileInput.files[0];
   if (!file) return;
@@ -80,75 +56,80 @@ btn.addEventListener("click", async () => {
       wb.SheetNames.find(s => s === "Master Data") ||
       wb.SheetNames[0];
 
-    const masterRows = XLSX.utils.sheet_to_json(
+    const master = XLSX.utils.sheet_to_json(
       wb.Sheets[sheet],
       { defval: "" }
     );
 
-    if (!masterRows.length) throw new Error("Sheet Master kosong");
+    if (!master.length) throw new Error("Master kosong");
 
     const area =
       $("areaName").value ||
-      masterRows[0]["ID_Area"] ||
+      master[0]["ID_Area"] ||
       file.name.replace(/\.(xlsx|xls)$/i, "");
 
     // ================= HOME / HOME-BIZ =================
-    const HOME = masterRows
-      .filter(r => String(r["HOME/HOME-BIZ"]).trim() === "HOME")
-      .map(r => Object.fromEntries(HOME_HEADERS.map(h => [h, r[h] || ""])));
+    const HOME = [];
+    const HOME_BIZ = [];
 
-    const HOME_BIZ = masterRows
-      .filter(r => String(r["HOME/HOME-BIZ"]).trim() === "HOME-BIZ")
-      .map(r => Object.fromEntries(HOME_HEADERS.map(h => [h, r[h] || ""])));
+    master.forEach(r => {
+      const row = Object.fromEntries(
+        HOME_HEADERS.map(h => [h, r[h] || ""])
+      );
+      if (r["HOME/HOME-BIZ"] === "HOME") HOME.push(row);
+      if (r["HOME/HOME-BIZ"] === "HOME-BIZ") HOME_BIZ.push(row);
+    });
 
     // ================= FDT =================
-    const FDT = uniqBy(masterRows, "FDT_CODE")
-      .map(r => ({
-        "FDT_CODE": r["FDT_CODE"] || "",
-        "CLUSTER_NAME": r["CLUSTER_NAME"] || "",
-        "ID_Area": r["ID_Area"] || ""
-      }));
-
-    // ================= FAT =================
-    const fatMap = {};
-    masterRows.forEach(r => {
-      const raw = r["FAT ID/NETWORK ID"];
-      if (!raw) return;
-      raw.split(/[,&]/).forEach(x => {
-        const code = x.trim();
-        if (!code) return;
-        fatMap[code] = {
-          "FAT_CODE": code,
-          "FDT_CODE": r["FDT_CODE"] || "",
+    const fdtMap = {};
+    master.forEach(r => {
+      if (!r["FDT_CODE"]) return;
+      const key = r["FDT_CODE"];
+      if (!fdtMap[key]) {
+        fdtMap[key] = {
+          "FDT_CODE": r["FDT_CODE"],
           "CLUSTER_NAME": r["CLUSTER_NAME"] || "",
           "ID_Area": r["ID_Area"] || ""
         };
+      }
+    });
+    const FDT = Object.values(fdtMap);
+
+    // ================= FAT =================
+    const FAT = [];
+    master.forEach(r => {
+      const raw = r["FAT ID/NETWORK ID"];
+      if (!raw) return;
+
+      raw.split("&").map(x => x.trim()).filter(Boolean).forEach(fat => {
+        FAT.push({
+          "FAT_CODE": fat,
+          "FDT_CODE": r["FDT_CODE"] || "",
+          "CLUSTER_NAME": r["CLUSTER_NAME"] || "",
+          "ID_Area": r["ID_Area"] || ""
+        });
       });
     });
-    const FAT = Object.values(fatMap);
-
-    // ================= HOOK =================
-    const HOOK = uniqBy(masterRows, "Clamp_Hook_ID")
-      .map(r => ({
-        "Clamp_Hook_ID": r["Clamp_Hook_ID"] || "",
-        "Clamp_Hook_LATITUDE": r["Clamp_Hook_LATITUDE"] || "",
-        "Clamp_Hook_LONGITUDE": r["Clamp_Hook_LONGITUDE"] || "",
-        "CLUSTER_NAME": r["CLUSTER_NAME"] || "",
-        "ID_Area": r["ID_Area"] || ""
-      }));
 
     // ================= POLE =================
-    const POLE = uniqBy(masterRows, "Pole ID (New)")
-      .map(r => ({
-        "Pole ID (New)": r["Pole ID (New)"] || "",
-        "Coordinate (Lat) NEW": r["Coordinate (Lat) NEW"] || "",
-        "Coordinate (Long) NEW": r["Coordinate (Long) NEW"] || "",
-        "Pole Provider (New)": r["Pole Provider (New)"] || "",
-        "Pole Type": r["Pole Type"] || "",
-        "LINE": r["LINE"] || "",
-        "CLUSTER_NAME": r["CLUSTER_NAME"] || "",
-        "ID_Area": r["ID_Area"] || ""
-      }));
+    const poleMap = {};
+    master.forEach(r => {
+      if (!r["Pole ID (New)"]) return;
+      const key = r["Pole ID (New)"] + "|" + r["CLUSTER_NAME"] + "|" + r["ID_Area"];
+      if (!poleMap[key]) {
+        poleMap[key] = {
+          "Pole ID (New)": r["Pole ID (New)"],
+          "Coordinate (Lat) NEW": r["Coordinate (Lat) NEW"] || "",
+          "Coordinate (Long) NEW": r["Coordinate (Long) NEW"] || "",
+          "Pole Provider (New)": r["Pole Provider (New)"] || "",
+          "Pole Type": r["Pole Type"] || "",
+          "LINE": r["LINE"] || "",
+          "CLUSTER_NAME": r["CLUSTER_NAME"] || "",
+          "ID_Area": r["ID_Area"] || ""
+        };
+      }
+    });
+    const POLE = Object.values(poleMap);
 
     // ================= ZIP =================
     const zip = new JSZip();
@@ -158,20 +139,12 @@ btn.addEventListener("click", async () => {
     folder.file("HOME-BIZ.csv", toCSV(HOME_HEADERS, HOME_BIZ));
     folder.file("FDT.csv", toCSV(FDT_HEADERS, FDT));
     folder.file("FAT.csv", toCSV(FAT_HEADERS, FAT));
-    folder.file("HOOK.csv", toCSV(HOOK_HEADERS, HOOK));
     folder.file("POLE.csv", toCSV(POLE_HEADERS, POLE));
-
-    cHome.textContent = HOME.length;
-    cHomeBiz.textContent = HOME_BIZ.length;
-    cFdt.textContent = FDT.length;
-    cFat.textContent = FAT.length;
-    cHook.textContent = HOOK.length;
-    cPole.textContent = POLE.length;
 
     const blob = await zip.generateAsync({ type: "blob" });
     saveAs(blob, `${area}_popups.zip`);
 
-    statusEl.textContent = "SELESAI ✔ CSV SESUAI CONTOH";
+    statusEl.textContent = "SELESAI ✔ ISI SESUAI CSV SEHARUSNYA";
   } catch (e) {
     console.error(e);
     statusEl.textContent = "ERROR: " + e.message;
