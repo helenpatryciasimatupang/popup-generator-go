@@ -1,7 +1,8 @@
 // =====================================================
 // POP UP CSV GENERATOR — FINAL TEMPLATE FIX (FULL)
-// FDT, FAT, POLE: sudah OK (tetap)
-// HOME & HOME-BIZ: FIX pakai KOLOM TERAKHIR sebagai kategori
+// FDT, FAT, POLE: sudah OK
+// HOME & HOME-BIZ: pakai KOLOM TERAKHIR untuk FILTER,
+//                  Category BizPass TETAP nilai ASLI master
 // =====================================================
 
 const $ = (id) => document.getElementById(id);
@@ -88,15 +89,14 @@ function lastColumnValue(row) {
   return row[keys[keys.length - 1]] ?? "";
 }
 
-function classifyFromLastColumn(row) {
-  const raw = String(lastColumnValue(row)).trim().toUpperCase();
+function isHomeBizFromLastColumn(row) {
+  const raw = String(lastColumnValue(row))
+    .trim()
+    .toUpperCase()
+    .replace(/\s+/g, "");
 
-  // Normalisasi nilai dari kolom terakhir
-  if (raw === "HOME") return "HOME";
-  if (raw.includes("BIZ") || raw.includes("BIS")) return "HOME-BIZ";
-
-  // Kalau tidak jelas, jangan buang data -> masuk HOME
-  return "HOME";
+  // Semua indikasi BIZ / BIS / BUSINESS
+  return raw.includes("BIZ") || raw.includes("BIS") || raw.includes("BUSINESS");
 }
 
 // ================= MAIN =================
@@ -111,46 +111,67 @@ btn.addEventListener("click", async () => {
     const buf = await file.arrayBuffer();
     const wb = XLSX.read(buf, { type: "array" });
 
-    const sheet = wb.SheetNames.find((s) => s === "Master Data") || wb.SheetNames[0];
+    const sheet =
+      wb.SheetNames.find((s) => s === "Master Data") || wb.SheetNames[0];
 
     const master = XLSX.utils.sheet_to_json(wb.Sheets[sheet], { defval: "" });
 
     if (!master.length) throw new Error("Master kosong");
 
-    const area = $("areaName").value || master[0]["ID_Area"] || file.name.replace(/\.(xlsx|xls)$/i, "");
+    const area =
+      $("areaName").value ||
+      master[0]["ID_Area"] ||
+      file.name.replace(/\.(xlsx|xls)$/i, "");
 
-    // ================= HOME / HOME-BIZ (FIXED) =================
+    // ================= HOME / HOME-BIZ (FINAL FIX) =================
     const HOME = [];
     const HOME_BIZ = [];
 
     master.forEach((r) => {
-      const cls = classifyFromLastColumn(r);
+      // Bangun row sesuai template HOME_HEADERS
+      const row = Object.fromEntries(
+        HOME_HEADERS.map((h) => [h, r[h] || ""])
+      );
 
-      const row = Object.fromEntries(HOME_HEADERS.map((h) => [h, r[h] || ""]));
+      // ⚠️ PENTING: Category BizPass TETAP nilai ASLI dari master
+      row["Category BizPass"] = r["Category BizPass"] || "";
 
-      // Pastikan kolom output "Category BizPass" terisi sesuai hasil klasifikasi
-      row["Category BizPass"] = cls;
-
-      if (cls === "HOME") HOME.push(row);
-      if (cls === "HOME-BIZ") HOME_BIZ.push(row);
+      // Klasifikasi HANYA untuk penempatan file
+      if (isHomeBizFromLastColumn(r)) {
+        HOME_BIZ.push(row);
+      } else {
+        HOME.push(row);
+      }
     });
 
     // ================= FAT =================
     const FAT = [];
     master.forEach((r) => {
-      FAT.push(Object.fromEntries(FAT_FDT_HEADERS.map((h) => [h, r[h] || ""])));
+      FAT.push(
+        Object.fromEntries(
+          FAT_FDT_HEADERS.map((h) => [h, r[h] || ""])
+        )
+      );
     });
 
     // ================= FDT =================
     const FDT = [];
     master.forEach((r) => {
-      FDT.push(Object.fromEntries(FAT_FDT_HEADERS.map((h) => [h, r[h] || ""])));
+      FDT.push(
+        Object.fromEntries(
+          FAT_FDT_HEADERS.map((h) => [h, r[h] || ""])
+        )
+      );
     });
 
     // ================= POLE =================
     const POLE = [];
     master.forEach((r) => {
-      POLE.push(Object.fromEntries(POLE_HEADERS.map((h) => [h, r[h] || ""])));
+      POLE.push(
+        Object.fromEntries(
+          POLE_HEADERS.map((h) => [h, r[h] || ""])
+        )
+      );
     });
 
     // ================= ZIP =================
@@ -166,7 +187,9 @@ btn.addEventListener("click", async () => {
     const blob = await zip.generateAsync({ type: "blob" });
     saveAs(blob, `${area}_POPUP.zip`);
 
-    statusEl.textContent = `SELESAI ✔ HOME=${HOME.length} | HOME-BIZ=${HOME_BIZ.length} | FAT=${FAT.length} | FDT=${FDT.length} | POLE=${POLE.length}`;
+    statusEl.textContent =
+      `SELESAI ✔ HOME=${HOME.length} | HOME-BIZ=${HOME_BIZ.length} | ` +
+      `FAT=${FAT.length} | FDT=${FDT.length} | POLE=${POLE.length}`;
   } catch (e) {
     console.error(e);
     statusEl.textContent = "ERROR: " + e.message;
