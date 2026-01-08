@@ -1,4 +1,7 @@
-// ===== Pop Up CSV Generator (FINAL FIX) =====
+// ===============================
+// Pop Up CSV Generator
+// TEMPLATE-BASED (FINAL)
+// ===============================
 
 const $ = (id) => document.getElementById(id);
 
@@ -17,26 +20,24 @@ fileInput.addEventListener("change", () => {
   btn.disabled = !fileInput.files.length;
 });
 
-function toCSV(rows) {
-  if (!rows.length) return "";
-  const headers = Object.keys(rows[0]);
+const SEP = ";";
+
+function csv(headers, rows) {
   const esc = (v) =>
     `"${String(v ?? "").replace(/"/g, '""')}"`;
-  const sep = ";";
-
   const lines = [];
-  lines.push(headers.map(esc).join(sep));
+  lines.push(headers.map(esc).join(SEP));
   rows.forEach((r) =>
-    lines.push(headers.map((h) => esc(r[h])).join(sep))
+    lines.push(headers.map((h) => esc(r[h])).join(SEP))
   );
   return lines.join("\n");
 }
 
-function uniqBy(arr, keyFn) {
+function uniqBy(arr, key) {
   const map = {};
-  arr.forEach((x) => {
-    const k = keyFn(x);
-    if (k) map[k] = x;
+  arr.forEach((r) => {
+    const v = r[key];
+    if (v && v !== "-") map[v] = r;
   });
   return Object.values(map);
 }
@@ -52,67 +53,130 @@ btn.addEventListener("click", async () => {
     const data = await file.arrayBuffer();
     const wb = XLSX.read(data, { type: "array" });
 
-    const sheetName =
-      wb.SheetNames.find((n) => n === "Master Data") ||
+    const sheet =
+      wb.SheetNames.find((s) => s === "Master Data") ||
       wb.SheetNames[0];
 
-    const ws = wb.Sheets[sheetName];
-    const rows = XLSX.utils.sheet_to_json(ws, {
-      defval: "",
-      raw: false,
-    });
+    const rows = XLSX.utils.sheet_to_json(
+      wb.Sheets[sheet],
+      { defval: "" }
+    );
 
     if (!rows.length) throw new Error("Sheet kosong");
-
-    const headers = Object.keys(rows[0]);
-    const colType = headers.find((h) => h.trim() === "HOME/HOME-BIZ");
-    if (!colType) throw new Error("Kolom HOME/HOME-BIZ tidak ditemukan");
-
-    const HOME = [];
-    const HOME_BIZ = [];
-
-    rows.forEach((r) => {
-      const v = String(r[colType]).toUpperCase().trim();
-      if (v === "HOME") HOME.push(r);
-      if (v === "HOME-BIZ" || v === "HOMEBIZ") HOME_BIZ.push(r);
-    });
-
-    const FAT = uniqBy(rows, (r) => r["FAT ID/NETWORK ID"]);
-    const FDT = uniqBy(rows, (r) => r["FDT_CODE"]);
-    const POLE = uniqBy(rows, (r) => r["Pole ID (New)"]);
-    const HOOK = uniqBy(rows, (r) => r["Clamp_Hook_ID"]);
-
-    // update preview
-    cHome.textContent = HOME.length;
-    cHomeBiz.textContent = HOME_BIZ.length;
-    cFat.textContent = FAT.length;
-    cFdt.textContent = FDT.length;
-    cPole.textContent = POLE.length;
-    cHook.textContent = HOOK.length;
-
-    const zip = new JSZip();
 
     const area =
       $("areaName").value ||
       rows[0]["ID_Area"] ||
       file.name.replace(/\.(xlsx|xls)$/i, "");
 
+    // ================= HOME & HOME-BIZ =================
+    const HOME_HEADERS = Object.keys(rows[0]);
+
+    const HOME = rows.filter(
+      (r) => String(r["HOME/HOME-BIZ"]).trim() === "HOME"
+    );
+
+    const HOME_BIZ = rows.filter(
+      (r) => String(r["HOME/HOME-BIZ"]).trim() === "HOME-BIZ"
+    );
+
+    // ================= FDT =================
+    const FDT_HEADERS = ["FDT_CODE", "CLUSTER_NAME", "ID_Area"];
+
+    const FDT = uniqBy(rows, "FDT_CODE").map((r) => ({
+      "FDT_CODE": r["FDT_CODE"],
+      "CLUSTER_NAME": r["CLUSTER_NAME"],
+      "ID_Area": r["ID_Area"],
+    }));
+
+    // ================= FAT =================
+    const FAT_HEADERS = ["FAT_CODE", "FDT_CODE", "CLUSTER_NAME", "ID_Area"];
+    const fatMap = {};
+
+    rows.forEach((r) => {
+      const raw = r["FAT ID/NETWORK ID"];
+      if (!raw) return;
+
+      raw.split(/[,&]/).forEach((x) => {
+        const code = x.trim();
+        if (!code) return;
+
+        fatMap[code] = {
+          "FAT_CODE": code,
+          "FDT_CODE": r["FDT_CODE"],
+          "CLUSTER_NAME": r["CLUSTER_NAME"],
+          "ID_Area": r["ID_Area"],
+        };
+      });
+    });
+
+    const FAT = Object.values(fatMap);
+
+    // ================= HOOK =================
+    const HOOK_HEADERS = [
+      "Clamp_Hook_ID",
+      "Clamp_Hook_LATITUDE",
+      "Clamp_Hook_LONGITUDE",
+      "CLUSTER_NAME",
+      "ID_Area",
+    ];
+
+    const HOOK = uniqBy(rows, "Clamp_Hook_ID").map((r) => ({
+      "Clamp_Hook_ID": r["Clamp_Hook_ID"],
+      "Clamp_Hook_LATITUDE": r["Clamp_Hook_LATITUDE"],
+      "Clamp_Hook_LONGITUDE": r["Clamp_Hook_LONGITUDE"],
+      "CLUSTER_NAME": r["CLUSTER_NAME"],
+      "ID_Area": r["ID_Area"],
+    }));
+
+    // ================= POLE =================
+    const POLE_HEADERS = [
+      "Pole ID (New)",
+      "Coordinate (Lat) NEW",
+      "Coordinate (Long) NEW",
+      "Pole Provider (New)",
+      "Pole Type",
+      "LINE",
+      "CLUSTER_NAME",
+      "ID_Area",
+    ];
+
+    const POLE = uniqBy(rows, "Pole ID (New)").map((r) => ({
+      "Pole ID (New)": r["Pole ID (New)"],
+      "Coordinate (Lat) NEW": r["Coordinate (Lat) NEW"],
+      "Coordinate (Long) NEW": r["Coordinate (Long) NEW"],
+      "Pole Provider (New)": r["Pole Provider (New)"],
+      "Pole Type": r["Pole Type"],
+      "LINE": r["LINE"],
+      "CLUSTER_NAME": r["CLUSTER_NAME"],
+      "ID_Area": r["ID_Area"],
+    }));
+
+    // ================= ZIP =================
+    const zip = new JSZip();
     const folder = zip.folder(area);
 
-    folder.file("HOME.csv", toCSV(HOME));
-    folder.file("HOME-BIZ.csv", toCSV(HOME_BIZ));
-    folder.file("FAT.csv", toCSV(FAT));
-    folder.file("FDT.csv", toCSV(FDT));
-    folder.file("POLE.csv", toCSV(POLE));
-    folder.file("HOOK.csv", toCSV(HOOK));
+    folder.file("HOME.csv", csv(HOME_HEADERS, HOME));
+    folder.file("HOME-BIZ.csv", csv(HOME_HEADERS, HOME_BIZ));
+    folder.file("FDT.csv", csv(FDT_HEADERS, FDT));
+    folder.file("FAT.csv", csv(FAT_HEADERS, FAT));
+    folder.file("HOOK.csv", csv(HOOK_HEADERS, HOOK));
+    folder.file("POLE.csv", csv(POLE_HEADERS, POLE));
+
+    cHome.textContent = HOME.length;
+    cHomeBiz.textContent = HOME_BIZ.length;
+    cFdt.textContent = FDT.length;
+    cFat.textContent = FAT.length;
+    cHook.textContent = HOOK.length;
+    cPole.textContent = POLE.length;
 
     const blob = await zip.generateAsync({ type: "blob" });
     saveAs(blob, `${area}_popups.zip`);
 
-    statusEl.textContent = "Selesai ✔ ZIP terdownload";
-  } catch (err) {
-    console.error(err);
-    statusEl.textContent = "ERROR: " + err.message;
+    statusEl.textContent = "Selesai ✔ CSV SESUAI TEMPLATE";
+  } catch (e) {
+    console.error(e);
+    statusEl.textContent = "ERROR: " + e.message;
   } finally {
     btn.disabled = false;
   }
