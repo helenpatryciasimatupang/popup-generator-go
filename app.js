@@ -1,7 +1,8 @@
-// =======================================================
+// =====================================================
 // POP UP CSV GENERATOR
-// FINAL – HARDCODE TEMPLATE (IKUT CSV CONTOH)
-// =======================================================
+// FINAL – CSV TEMPLATE AUTHORITATIVE
+// Jika data tidak ada di Master -> kosong
+// =====================================================
 
 const $ = (id) => document.getElementById(id);
 
@@ -23,9 +24,9 @@ fileInput.addEventListener("change", () => {
 const SEP = ";";
 const esc = (v) => `"${String(v ?? "").replace(/"/g, '""')}"`;
 
-// =====================
-// TEMPLATE HEADERS (FIX)
-// =====================
+// =====================================================
+// CSV TEMPLATE HEADERS (PERSIS CSV CONTOH)
+// =====================================================
 const HOME_HEADERS = [
   "HOME_PASS_ID","ADDRESS","RT","RW","KELURAHAN","KECAMATAN","KABUPATEN",
   "PROVINSI","POSTAL_CODE","CLUSTER_NAME","ID_Area","LATITUDE","LONGITUDE",
@@ -44,7 +45,7 @@ const POLE_HEADERS = [
   "Pole Provider (New)","Pole Type","LINE","CLUSTER_NAME","ID_Area"
 ];
 
-// =====================
+// =====================================================
 function toCSV(headers, rows) {
   const out = [];
   out.push(headers.map(esc).join(SEP));
@@ -63,12 +64,12 @@ function uniqBy(rows, key) {
   return Object.values(map);
 }
 
-// =====================
+// =====================================================
 btn.addEventListener("click", async () => {
   const file = fileInput.files[0];
   if (!file) return;
 
-  statusEl.textContent = "Memproses Excel...";
+  statusEl.textContent = "Memproses Master Excel...";
   btn.disabled = true;
 
   try {
@@ -79,36 +80,38 @@ btn.addEventListener("click", async () => {
       wb.SheetNames.find(s => s === "Master Data") ||
       wb.SheetNames[0];
 
-    const rows = XLSX.utils.sheet_to_json(
+    const masterRows = XLSX.utils.sheet_to_json(
       wb.Sheets[sheet],
       { defval: "" }
     );
 
-    if (!rows.length) throw new Error("Sheet kosong");
+    if (!masterRows.length) throw new Error("Sheet Master kosong");
 
     const area =
       $("areaName").value ||
-      rows[0]["ID_Area"] ||
+      masterRows[0]["ID_Area"] ||
       file.name.replace(/\.(xlsx|xls)$/i, "");
 
     // ================= HOME / HOME-BIZ =================
-    const HOME = rows.filter(
-      r => String(r["HOME/HOME-BIZ"]).trim() === "HOME"
-    );
-    const HOME_BIZ = rows.filter(
-      r => String(r["HOME/HOME-BIZ"]).trim() === "HOME-BIZ"
-    );
+    const HOME = masterRows
+      .filter(r => String(r["HOME/HOME-BIZ"]).trim() === "HOME")
+      .map(r => Object.fromEntries(HOME_HEADERS.map(h => [h, r[h] || ""])));
+
+    const HOME_BIZ = masterRows
+      .filter(r => String(r["HOME/HOME-BIZ"]).trim() === "HOME-BIZ")
+      .map(r => Object.fromEntries(HOME_HEADERS.map(h => [h, r[h] || ""])));
 
     // ================= FDT =================
-    const FDT = uniqBy(rows, "FDT_CODE").map(r => ({
-      "FDT_CODE": r["FDT_CODE"],
-      "CLUSTER_NAME": r["CLUSTER_NAME"],
-      "ID_Area": r["ID_Area"]
-    }));
+    const FDT = uniqBy(masterRows, "FDT_CODE")
+      .map(r => ({
+        "FDT_CODE": r["FDT_CODE"] || "",
+        "CLUSTER_NAME": r["CLUSTER_NAME"] || "",
+        "ID_Area": r["ID_Area"] || ""
+      }));
 
     // ================= FAT =================
     const fatMap = {};
-    rows.forEach(r => {
+    masterRows.forEach(r => {
       const raw = r["FAT ID/NETWORK ID"];
       if (!raw) return;
       raw.split(/[,&]/).forEach(x => {
@@ -116,34 +119,36 @@ btn.addEventListener("click", async () => {
         if (!code) return;
         fatMap[code] = {
           "FAT_CODE": code,
-          "FDT_CODE": r["FDT_CODE"],
-          "CLUSTER_NAME": r["CLUSTER_NAME"],
-          "ID_Area": r["ID_Area"]
+          "FDT_CODE": r["FDT_CODE"] || "",
+          "CLUSTER_NAME": r["CLUSTER_NAME"] || "",
+          "ID_Area": r["ID_Area"] || ""
         };
       });
     });
     const FAT = Object.values(fatMap);
 
     // ================= HOOK =================
-    const HOOK = uniqBy(rows, "Clamp_Hook_ID").map(r => ({
-      "Clamp_Hook_ID": r["Clamp_Hook_ID"],
-      "Clamp_Hook_LATITUDE": r["Clamp_Hook_LATITUDE"],
-      "Clamp_Hook_LONGITUDE": r["Clamp_Hook_LONGITUDE"],
-      "CLUSTER_NAME": r["CLUSTER_NAME"],
-      "ID_Area": r["ID_Area"]
-    }));
+    const HOOK = uniqBy(masterRows, "Clamp_Hook_ID")
+      .map(r => ({
+        "Clamp_Hook_ID": r["Clamp_Hook_ID"] || "",
+        "Clamp_Hook_LATITUDE": r["Clamp_Hook_LATITUDE"] || "",
+        "Clamp_Hook_LONGITUDE": r["Clamp_Hook_LONGITUDE"] || "",
+        "CLUSTER_NAME": r["CLUSTER_NAME"] || "",
+        "ID_Area": r["ID_Area"] || ""
+      }));
 
     // ================= POLE =================
-    const POLE = uniqBy(rows, "Pole ID (New)").map(r => ({
-      "Pole ID (New)": r["Pole ID (New)"],
-      "Coordinate (Lat) NEW": r["Coordinate (Lat) NEW"],
-      "Coordinate (Long) NEW": r["Coordinate (Long) NEW"],
-      "Pole Provider (New)": r["Pole Provider (New)"],
-      "Pole Type": r["Pole Type"],
-      "LINE": r["LINE"],
-      "CLUSTER_NAME": r["CLUSTER_NAME"],
-      "ID_Area": r["ID_Area"]
-    }));
+    const POLE = uniqBy(masterRows, "Pole ID (New)")
+      .map(r => ({
+        "Pole ID (New)": r["Pole ID (New)"] || "",
+        "Coordinate (Lat) NEW": r["Coordinate (Lat) NEW"] || "",
+        "Coordinate (Long) NEW": r["Coordinate (Long) NEW"] || "",
+        "Pole Provider (New)": r["Pole Provider (New)"] || "",
+        "Pole Type": r["Pole Type"] || "",
+        "LINE": r["LINE"] || "",
+        "CLUSTER_NAME": r["CLUSTER_NAME"] || "",
+        "ID_Area": r["ID_Area"] || ""
+      }));
 
     // ================= ZIP =================
     const zip = new JSZip();
@@ -166,7 +171,7 @@ btn.addEventListener("click", async () => {
     const blob = await zip.generateAsync({ type: "blob" });
     saveAs(blob, `${area}_popups.zip`);
 
-    statusEl.textContent = "SELESAI ✔ CSV PERSIS TEMPLATE";
+    statusEl.textContent = "SELESAI ✔ CSV SESUAI CONTOH";
   } catch (e) {
     console.error(e);
     statusEl.textContent = "ERROR: " + e.message;
