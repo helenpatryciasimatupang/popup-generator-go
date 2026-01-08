@@ -1,7 +1,7 @@
-// ===============================
-// Pop Up CSV Generator
-// TEMPLATE-BASED (FINAL)
-// ===============================
+// =======================================================
+// POP UP CSV GENERATOR
+// FINAL – HARDCODE TEMPLATE (IKUT CSV CONTOH)
+// =======================================================
 
 const $ = (id) => document.getElementById(id);
 
@@ -21,40 +21,62 @@ fileInput.addEventListener("change", () => {
 });
 
 const SEP = ";";
+const esc = (v) => `"${String(v ?? "").replace(/"/g, '""')}"`;
 
-function csv(headers, rows) {
-  const esc = (v) =>
-    `"${String(v ?? "").replace(/"/g, '""')}"`;
-  const lines = [];
-  lines.push(headers.map(esc).join(SEP));
-  rows.forEach((r) =>
-    lines.push(headers.map((h) => esc(r[h])).join(SEP))
-  );
-  return lines.join("\n");
+// =====================
+// TEMPLATE HEADERS (FIX)
+// =====================
+const HOME_HEADERS = [
+  "HOME_PASS_ID","ADDRESS","RT","RW","KELURAHAN","KECAMATAN","KABUPATEN",
+  "PROVINSI","POSTAL_CODE","CLUSTER_NAME","ID_Area","LATITUDE","LONGITUDE",
+  "FDT_CODE","FAT ID/NETWORK ID","Pole ID (New)","Clamp_Hook_ID",
+  "HOME/HOME-BIZ"
+];
+
+const FDT_HEADERS = ["FDT_CODE","CLUSTER_NAME","ID_Area"];
+const FAT_HEADERS = ["FAT_CODE","FDT_CODE","CLUSTER_NAME","ID_Area"];
+const HOOK_HEADERS = [
+  "Clamp_Hook_ID","Clamp_Hook_LATITUDE","Clamp_Hook_LONGITUDE",
+  "CLUSTER_NAME","ID_Area"
+];
+const POLE_HEADERS = [
+  "Pole ID (New)","Coordinate (Lat) NEW","Coordinate (Long) NEW",
+  "Pole Provider (New)","Pole Type","LINE","CLUSTER_NAME","ID_Area"
+];
+
+// =====================
+function toCSV(headers, rows) {
+  const out = [];
+  out.push(headers.map(esc).join(SEP));
+  rows.forEach(r => {
+    out.push(headers.map(h => esc(r[h])).join(SEP));
+  });
+  return out.join("\n");
 }
 
-function uniqBy(arr, key) {
+function uniqBy(rows, key) {
   const map = {};
-  arr.forEach((r) => {
+  rows.forEach(r => {
     const v = r[key];
     if (v && v !== "-") map[v] = r;
   });
   return Object.values(map);
 }
 
+// =====================
 btn.addEventListener("click", async () => {
   const file = fileInput.files[0];
   if (!file) return;
 
-  statusEl.textContent = "Membaca Excel...";
+  statusEl.textContent = "Memproses Excel...";
   btn.disabled = true;
 
   try {
-    const data = await file.arrayBuffer();
-    const wb = XLSX.read(data, { type: "array" });
+    const buf = await file.arrayBuffer();
+    const wb = XLSX.read(buf, { type: "array" });
 
     const sheet =
-      wb.SheetNames.find((s) => s === "Master Data") ||
+      wb.SheetNames.find(s => s === "Master Data") ||
       wb.SheetNames[0];
 
     const rows = XLSX.utils.sheet_to_json(
@@ -69,79 +91,50 @@ btn.addEventListener("click", async () => {
       rows[0]["ID_Area"] ||
       file.name.replace(/\.(xlsx|xls)$/i, "");
 
-    // ================= HOME & HOME-BIZ =================
-    const HOME_HEADERS = Object.keys(rows[0]);
-
+    // ================= HOME / HOME-BIZ =================
     const HOME = rows.filter(
-      (r) => String(r["HOME/HOME-BIZ"]).trim() === "HOME"
+      r => String(r["HOME/HOME-BIZ"]).trim() === "HOME"
     );
-
     const HOME_BIZ = rows.filter(
-      (r) => String(r["HOME/HOME-BIZ"]).trim() === "HOME-BIZ"
+      r => String(r["HOME/HOME-BIZ"]).trim() === "HOME-BIZ"
     );
 
     // ================= FDT =================
-    const FDT_HEADERS = ["FDT_CODE", "CLUSTER_NAME", "ID_Area"];
-
-    const FDT = uniqBy(rows, "FDT_CODE").map((r) => ({
+    const FDT = uniqBy(rows, "FDT_CODE").map(r => ({
       "FDT_CODE": r["FDT_CODE"],
       "CLUSTER_NAME": r["CLUSTER_NAME"],
-      "ID_Area": r["ID_Area"],
+      "ID_Area": r["ID_Area"]
     }));
 
     // ================= FAT =================
-    const FAT_HEADERS = ["FAT_CODE", "FDT_CODE", "CLUSTER_NAME", "ID_Area"];
     const fatMap = {};
-
-    rows.forEach((r) => {
+    rows.forEach(r => {
       const raw = r["FAT ID/NETWORK ID"];
       if (!raw) return;
-
-      raw.split(/[,&]/).forEach((x) => {
+      raw.split(/[,&]/).forEach(x => {
         const code = x.trim();
         if (!code) return;
-
         fatMap[code] = {
           "FAT_CODE": code,
           "FDT_CODE": r["FDT_CODE"],
           "CLUSTER_NAME": r["CLUSTER_NAME"],
-          "ID_Area": r["ID_Area"],
+          "ID_Area": r["ID_Area"]
         };
       });
     });
-
     const FAT = Object.values(fatMap);
 
     // ================= HOOK =================
-    const HOOK_HEADERS = [
-      "Clamp_Hook_ID",
-      "Clamp_Hook_LATITUDE",
-      "Clamp_Hook_LONGITUDE",
-      "CLUSTER_NAME",
-      "ID_Area",
-    ];
-
-    const HOOK = uniqBy(rows, "Clamp_Hook_ID").map((r) => ({
+    const HOOK = uniqBy(rows, "Clamp_Hook_ID").map(r => ({
       "Clamp_Hook_ID": r["Clamp_Hook_ID"],
       "Clamp_Hook_LATITUDE": r["Clamp_Hook_LATITUDE"],
       "Clamp_Hook_LONGITUDE": r["Clamp_Hook_LONGITUDE"],
       "CLUSTER_NAME": r["CLUSTER_NAME"],
-      "ID_Area": r["ID_Area"],
+      "ID_Area": r["ID_Area"]
     }));
 
     // ================= POLE =================
-    const POLE_HEADERS = [
-      "Pole ID (New)",
-      "Coordinate (Lat) NEW",
-      "Coordinate (Long) NEW",
-      "Pole Provider (New)",
-      "Pole Type",
-      "LINE",
-      "CLUSTER_NAME",
-      "ID_Area",
-    ];
-
-    const POLE = uniqBy(rows, "Pole ID (New)").map((r) => ({
+    const POLE = uniqBy(rows, "Pole ID (New)").map(r => ({
       "Pole ID (New)": r["Pole ID (New)"],
       "Coordinate (Lat) NEW": r["Coordinate (Lat) NEW"],
       "Coordinate (Long) NEW": r["Coordinate (Long) NEW"],
@@ -149,19 +142,19 @@ btn.addEventListener("click", async () => {
       "Pole Type": r["Pole Type"],
       "LINE": r["LINE"],
       "CLUSTER_NAME": r["CLUSTER_NAME"],
-      "ID_Area": r["ID_Area"],
+      "ID_Area": r["ID_Area"]
     }));
 
     // ================= ZIP =================
     const zip = new JSZip();
     const folder = zip.folder(area);
 
-    folder.file("HOME.csv", csv(HOME_HEADERS, HOME));
-    folder.file("HOME-BIZ.csv", csv(HOME_HEADERS, HOME_BIZ));
-    folder.file("FDT.csv", csv(FDT_HEADERS, FDT));
-    folder.file("FAT.csv", csv(FAT_HEADERS, FAT));
-    folder.file("HOOK.csv", csv(HOOK_HEADERS, HOOK));
-    folder.file("POLE.csv", csv(POLE_HEADERS, POLE));
+    folder.file("HOME.csv", toCSV(HOME_HEADERS, HOME));
+    folder.file("HOME-BIZ.csv", toCSV(HOME_HEADERS, HOME_BIZ));
+    folder.file("FDT.csv", toCSV(FDT_HEADERS, FDT));
+    folder.file("FAT.csv", toCSV(FAT_HEADERS, FAT));
+    folder.file("HOOK.csv", toCSV(HOOK_HEADERS, HOOK));
+    folder.file("POLE.csv", toCSV(POLE_HEADERS, POLE));
 
     cHome.textContent = HOME.length;
     cHomeBiz.textContent = HOME_BIZ.length;
@@ -173,7 +166,7 @@ btn.addEventListener("click", async () => {
     const blob = await zip.generateAsync({ type: "blob" });
     saveAs(blob, `${area}_popups.zip`);
 
-    statusEl.textContent = "Selesai ✔ CSV SESUAI TEMPLATE";
+    statusEl.textContent = "SELESAI ✔ CSV PERSIS TEMPLATE";
   } catch (e) {
     console.error(e);
     statusEl.textContent = "ERROR: " + e.message;
