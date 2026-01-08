@@ -1,10 +1,9 @@
-alert("VERSI BARU: FDT CUMA 1A");
 // =====================================================
 // POP UP CSV GENERATOR — FINAL TEMPLATE FIX (FULL)
 // FIX UTAMA:
 // - HOME vs HOME-BIZ ditentukan dari KOLOM TERAKHIR EXCEL (AKURAT)
 // - Category BizPass TETAP nilai ASLI master (TIDAK diubah)
-// - FDT = HANYA 1 BARIS (1A) SESUAI CSV SEHARUSNYA
+// - FDT = HANYA 1 BARIS: ambil data POLE "1A" dari Master (lengkap printilan)
 // =====================================================
 
 const $ = (id) => document.getElementById(id);
@@ -160,16 +159,22 @@ btn.addEventListener("click", async () => {
       );
     });
 
-    // ================= FDT (FINAL: 1 BARIS SAJA = 1A) =================
+    // ================= FDT (FINAL: ambil data POLE 1A dari Master) =================
+    const fdtSource = master.find(
+      (r) =>
+        String(r["Pole ID (New)"] || "")
+          .trim()
+          .toUpperCase() === "1A"
+    );
+
+    if (!fdtSource) {
+      throw new Error('Data POLE "1A" tidak ditemukan di Master (Pole ID (New))');
+    }
+
     const FDT = [
-      {
-        "Pole ID (New)": "",
-        "Coordinate (Lat) NEW": "",
-        "Coordinate (Long) NEW": "",
-        "Pole Provider (New)": "",
-        "Pole Type": "",
-        "FAT ID/NETWORK ID": "1A",
-      },
+      Object.fromEntries(
+        FAT_FDT_HEADERS.map((h) => [h, fdtSource[h] || ""])
+      ),
     ];
 
     // ================= POLE =================
@@ -197,8 +202,7 @@ btn.addEventListener("click", async () => {
 
     statusEl.textContent =
       `SELESAI ✔ HOME=${HOME.length} | HOME-BIZ=${HOME_BIZ.length} | ` +
-      `FAT=${FAT.length} | FDT=1 | POLE=${POLE.length}`;
-
+      `FAT=${FAT.length} | FDT=1 (Pole 1A) | POLE=${POLE.length}`;
   } catch (e) {
     console.error(e);
     statusEl.textContent = "ERROR: " + e.message;
