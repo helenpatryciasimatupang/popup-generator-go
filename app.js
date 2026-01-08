@@ -1,8 +1,9 @@
 // =====================================================
 // POP UP CSV GENERATOR — FINAL TEMPLATE FIX (FULL)
-// FDT, FAT, POLE: sudah OK
-// HOME & HOME-BIZ: pakai KOLOM TERAKHIR untuk FILTER,
-//                  Category BizPass TETAP nilai ASLI master
+// FIX UTAMA:
+// - HOME vs HOME-BIZ ditentukan dari KOLOM TERAKHIR EXCEL (AKURAT)
+// - Category BizPass TETAP nilai ASLI master (TIDAK diubah)
+// - FDT, FAT, POLE tetap seperti sebelumnya (SUDAH BENAR)
 // =====================================================
 
 const $ = (id) => document.getElementById(id);
@@ -82,23 +83,6 @@ function toCSV(headers, rows) {
   return out.join("\n");
 }
 
-// ================= HOME/HOME-BIZ CLASSIFIER (KOLOM TERAKHIR) =================
-function lastColumnValue(row) {
-  const keys = Object.keys(row);
-  if (!keys.length) return "";
-  return row[keys[keys.length - 1]] ?? "";
-}
-
-function isHomeBizFromLastColumn(row) {
-  const raw = String(lastColumnValue(row))
-    .trim()
-    .toUpperCase()
-    .replace(/\s+/g, "");
-
-  // Semua indikasi BIZ / BIS / BUSINESS
-  return raw.includes("BIZ") || raw.includes("BIS") || raw.includes("BUSINESS");
-}
-
 // ================= MAIN =================
 btn.addEventListener("click", async () => {
   const file = fileInput.files[0];
@@ -111,10 +95,26 @@ btn.addEventListener("click", async () => {
     const buf = await file.arrayBuffer();
     const wb = XLSX.read(buf, { type: "array" });
 
-    const sheet =
+    const sheetName =
       wb.SheetNames.find((s) => s === "Master Data") || wb.SheetNames[0];
 
-    const master = XLSX.utils.sheet_to_json(wb.Sheets[sheet], { defval: "" });
+    const worksheet = wb.Sheets[sheetName];
+
+    // ================== AMBIL HEADER ASLI EXCEL ==================
+    const headerRow = XLSX.utils.sheet_to_json(worksheet, {
+      header: 1,
+      defval: "",
+    })[0];
+
+    if (!headerRow || !headerRow.length) {
+      throw new Error("Header Excel tidak terbaca");
+    }
+
+    // NAMA KOLOM TERAKHIR (INI KUNCI)
+    const LAST_COL_NAME = headerRow[headerRow.length - 1];
+
+    // DATA MASTER
+    const master = XLSX.utils.sheet_to_json(worksheet, { defval: "" });
 
     if (!master.length) throw new Error("Master kosong");
 
@@ -123,21 +123,29 @@ btn.addEventListener("click", async () => {
       master[0]["ID_Area"] ||
       file.name.replace(/\.(xlsx|xls)$/i, "");
 
-    // ================= HOME / HOME-BIZ (FINAL FIX) =================
+    // ================= HOME / HOME-BIZ (FIX AKURAT) =================
     const HOME = [];
     const HOME_BIZ = [];
 
     master.forEach((r) => {
-      // Bangun row sesuai template HOME_HEADERS
+      const lastVal = String(r[LAST_COL_NAME] || "")
+        .trim()
+        .toUpperCase()
+        .replace(/\s+/g, "");
+
+      const isBiz =
+        lastVal.includes("BIZ") ||
+        lastVal.includes("BIS") ||
+        lastVal.includes("BUSINESS");
+
       const row = Object.fromEntries(
         HOME_HEADERS.map((h) => [h, r[h] || ""])
       );
 
-      // ⚠️ PENTING: Category BizPass TETAP nilai ASLI dari master
+      // ⚠️ PENTING: JANGAN UBAH NILAI CATEGORY BIZPASS
       row["Category BizPass"] = r["Category BizPass"] || "";
 
-      // Klasifikasi HANYA untuk penempatan file
-      if (isHomeBizFromLastColumn(r)) {
+      if (isBiz) {
         HOME_BIZ.push(row);
       } else {
         HOME.push(row);
@@ -190,6 +198,7 @@ btn.addEventListener("click", async () => {
     statusEl.textContent =
       `SELESAI ✔ HOME=${HOME.length} | HOME-BIZ=${HOME_BIZ.length} | ` +
       `FAT=${FAT.length} | FDT=${FDT.length} | POLE=${POLE.length}`;
+
   } catch (e) {
     console.error(e);
     statusEl.textContent = "ERROR: " + e.message;
