@@ -10,7 +10,11 @@
   <div class="wrap">
     <header class="card">
       <h1>Pop Up CSV Generator</h1>
-      <p class="muted">Upload <b>Excel Master Pop Up</b> → download <b>ZIP</b> berisi 6 CSV (HOME, HOME-BIZ, FDT, FAT, HOOK, POLE). Semua proses terjadi di browser (tanpa upload ke server).</p>
+      <p class="muted">
+        Upload <b>Excel Master Pop Up</b> → download <b>ZIP</b> berisi
+        6 CSV (HOME, HOME-BIZ, FDT, FAT, HOOK, POLE).
+        Semua proses terjadi di browser (tanpa upload ke server).
+      </p>
     </header>
 
     <section class="card">
@@ -18,13 +22,18 @@
         <div>
           <label class="label">1) Pilih file Excel Master Pop Up (.xlsx)</label>
           <input id="file" type="file" accept=".xlsx,.xls" />
-          <div class="hint">Sheet yang dipakai: <b>Master Data</b> (kalau tidak ada, akan pakai sheet pertama).</div>
+          <div class="hint">
+            Sheet yang dipakai: <b>Master Data</b>
+            (kalau tidak ada, akan pakai sheet pertama).
+          </div>
         </div>
 
         <div>
           <label class="label">2) Nama folder area di dalam ZIP (opsional)</label>
           <input id="areaName" type="text" placeholder="Contoh: BABAT JERAWAT" />
-          <div class="hint">Kalau kosong, akan pakai <b>ID_Area</b> dari file (atau nama file).</div>
+          <div class="hint">
+            Kalau kosong, akan pakai <b>ID_Area</b> dari file (atau nama file).
+          </div>
         </div>
 
         <div>
@@ -45,28 +54,25 @@
         <div class="kv"><span>HOOK</span><b id="cHook">-</b></div>
         <div class="kv"><span>POLE</span><b id="cPole">-</b></div>
       </div>
-      <details class="details">
-        <summary>Lihat aturan pemisahan</summary>
-        <ul>
-          <li><b>HOME vs HOME-BIZ</b> ditentukan oleh kolom terakhir: <code>HOME/HOME-BIZ</code>.</li>
-          <li><b>FAT</b> diambil dari kolom <code>FAT ID/NETWORK ID</code> yang mengandung huruf <code>S</code> (bisa lebih dari 1 ID, dipisah dengan <code>&</code> / koma).</li>
-          <li><b>FDT</b> diambil dari <code>FAT ID/NETWORK ID</code> yang <i>tidak</i> mengandung <code>S</code> (contoh: <code>FBS05300</code>).</li>
-          <li><b>POLE</b> unik berdasarkan <code>Pole ID (New)</code>.</li>
-          <li><b>HOOK</b> unik berdasarkan <code>Clamp_Hook_ID</code> (mengabaikan <code>-</code>).</li>
-        </ul>
-      </details>
     </section>
 
     <footer class="muted small">
-      Dibuat untuk workflow: Excel Master Pop Up → 6 CSV. Tidak ada data yang diunggah ke server.
+      Dibuat untuk workflow: Excel Master Pop Up → 6 CSV.
+      Tidak ada data yang diunggah ke server.
     </footer>
   </div>
 
   <!-- Libraries (CDN) -->
-  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.20.2/dist/xlsx.full.min.js"></script>
+  <!-- XLSX: pakai UNPKG (stabil, global XLSX tersedia) -->
+  <script src="https://unpkg.com/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
+  <!-- JSZip -->
   <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+
+  <!-- FileSaver -->
   <script src="https://cdn.jsdelivr.net/npm/file-saver@2.0.5/dist/FileSaver.min.js"></script>
 
+  <!-- App logic -->
   <script src="./app.js"></script>
 </body>
 </html>
