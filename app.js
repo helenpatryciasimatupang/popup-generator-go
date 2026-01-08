@@ -3,7 +3,7 @@
 // FIX UTAMA:
 // - HOME vs HOME-BIZ ditentukan dari KOLOM TERAKHIR EXCEL (AKURAT)
 // - Category BizPass TETAP nilai ASLI master (TIDAK diubah)
-// - FDT, FAT, POLE tetap seperti sebelumnya (SUDAH BENAR)
+// - FDT = HANYA 1 BARIS (1A) SESUAI CSV SEHARUSNYA
 // =====================================================
 
 const $ = (id) => document.getElementById(id);
@@ -110,7 +110,7 @@ btn.addEventListener("click", async () => {
       throw new Error("Header Excel tidak terbaca");
     }
 
-    // NAMA KOLOM TERAKHIR (INI KUNCI)
+    // NAMA KOLOM TERAKHIR
     const LAST_COL_NAME = headerRow[headerRow.length - 1];
 
     // DATA MASTER
@@ -123,7 +123,7 @@ btn.addEventListener("click", async () => {
       master[0]["ID_Area"] ||
       file.name.replace(/\.(xlsx|xls)$/i, "");
 
-    // ================= HOME / HOME-BIZ (FIX AKURAT) =================
+    // ================= HOME / HOME-BIZ =================
     const HOME = [];
     const HOME_BIZ = [];
 
@@ -142,14 +142,11 @@ btn.addEventListener("click", async () => {
         HOME_HEADERS.map((h) => [h, r[h] || ""])
       );
 
-      // ⚠️ PENTING: JANGAN UBAH NILAI CATEGORY BIZPASS
+      // Category BizPass TETAP nilai ASLI
       row["Category BizPass"] = r["Category BizPass"] || "";
 
-      if (isBiz) {
-        HOME_BIZ.push(row);
-      } else {
-        HOME.push(row);
-      }
+      if (isBiz) HOME_BIZ.push(row);
+      else HOME.push(row);
     });
 
     // ================= FAT =================
@@ -162,15 +159,17 @@ btn.addEventListener("click", async () => {
       );
     });
 
-    // ================= FDT =================
-    const FDT = [];
-    master.forEach((r) => {
-      FDT.push(
-        Object.fromEntries(
-          FAT_FDT_HEADERS.map((h) => [h, r[h] || ""])
-        )
-      );
-    });
+    // ================= FDT (FINAL: 1 BARIS SAJA = 1A) =================
+    const FDT = [
+      {
+        "Pole ID (New)": "",
+        "Coordinate (Lat) NEW": "",
+        "Coordinate (Long) NEW": "",
+        "Pole Provider (New)": "",
+        "Pole Type": "",
+        "FAT ID/NETWORK ID": "1A",
+      },
+    ];
 
     // ================= POLE =================
     const POLE = [];
@@ -197,7 +196,7 @@ btn.addEventListener("click", async () => {
 
     statusEl.textContent =
       `SELESAI ✔ HOME=${HOME.length} | HOME-BIZ=${HOME_BIZ.length} | ` +
-      `FAT=${FAT.length} | FDT=${FDT.length} | POLE=${POLE.length}`;
+      `FAT=${FAT.length} | FDT=1 | POLE=${POLE.length}`;
 
   } catch (e) {
     console.error(e);
