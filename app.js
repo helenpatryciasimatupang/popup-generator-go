@@ -8,21 +8,28 @@ btnPatchKmz.addEventListener("click", async () => {
       await csvZipInput.files[0].arrayBuffer()
     );
 
-    // 🔍 CARI FOLDER AREA (misal: BABAT JERAWAT/)
-    const folderName = Object.keys(csvZip.files).find(
-      (k) => csvZip.files[k].dir
+    // ===== DETEKSI APAKAH CSV ADA DI ROOT ATAU FOLDER =====
+    const csvFiles = Object.keys(csvZip.files).filter(
+      (f) => f.toUpperCase().endsWith(".CSV")
     );
 
-    if (!folderName) {
-      throw new Error("Folder area tidak ditemukan di ZIP CSV");
+    if (!csvFiles.length) {
+      throw new Error("ZIP tidak berisi file CSV");
     }
 
+    // Jika CSV berada dalam folder (misal: BABAT JERAWAT/HOME.csv)
+    const hasFolder = csvFiles.some((f) => f.includes("/"));
+    const basePath = hasFolder
+      ? csvFiles[0].substring(0, csvFiles[0].lastIndexOf("/") + 1)
+      : "";
+
     const readCSV = async (name) => {
-      const file = csvZip.file(folderName + name);
+      const file = csvZip.file(basePath + name);
       if (!file) throw new Error(`CSV tidak ditemukan: ${name}`);
       return parseCSV(await file.async("string"));
     };
 
+    // ================= LOAD CSV =================
     const HOME = await readCSV("HOME.csv");
     const HOME_BIZ = await readCSV("HOME-BIZ.csv");
     const POLE = await readCSV("POLE.csv");
@@ -34,13 +41,18 @@ btnPatchKmz.addEventListener("click", async () => {
       await kmzFileInput.files[0].arrayBuffer()
     );
 
-    const kmlName = Object.keys(kmz.files).find((f) => f.endsWith(".kml"));
-    if (!kmlName) throw new Error("File KML tidak ditemukan di KMZ");
+    const kmlName = Object.keys(kmz.files).find((f) =>
+      f.toLowerCase().endsWith(".kml")
+    );
+
+    if (!kmlName) {
+      throw new Error("File KML tidak ditemukan di KMZ");
+    }
 
     const kmlText = await kmz.file(kmlName).async("string");
     const doc = new DOMParser().parseFromString(kmlText, "text/xml");
 
-    // ================= PATCH FOLDER =================
+    // ================= PATCH PER FOLDER =================
     patchFolder(
       doc,
       ["DISTRIBUSI", "HP", "HOME"],
