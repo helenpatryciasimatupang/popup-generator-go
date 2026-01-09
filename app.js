@@ -103,3 +103,17 @@ btnPatchKmz.addEventListener("click", async () => {
     enablePatchBtn();
   }
 });
+// ================= FORCE ENABLE PATCH BUTTON =================
+function enablePatchBtn() {
+  btnPatchKmz.disabled = !(
+    kmzFileInput.files.length &&
+    csvZipInput.files.length
+  );
+}
+
+// PENTING: bind ulang event
+kmzFileInput.addEventListener("change", enablePatchBtn);
+csvZipInput.addEventListener("change", enablePatchBtn);
+
+// PENTING: paksa cek saat page load
+setTimeout(enablePatchBtn, 100);
