@@ -17,6 +17,7 @@
       </p>
     </header>
 
+    <!-- ===================== CSV GENERATOR (LAMA) ===================== -->
     <section class="card">
       <div class="grid">
         <div>
@@ -56,14 +57,59 @@
       </div>
     </section>
 
+    <!-- ===================== PATCH KMZ (BARU) ===================== -->
+    <section class="card">
+      <h2>Patch KMZ Desain (Isi Pop-Up Otomatis)</h2>
+      <p class="muted">
+        Upload <b>KMZ desain</b> + <b>ZIP CSV</b> (HOME, HOME-BIZ, POLE, FDT, FAT)
+        → download <b>KMZ baru</b> dengan pop-up terisi.
+        <br />
+        <b>Folder, garis, polygon, style TIDAK DIUBAH.</b>
+      </p>
+
+      <div class="grid">
+        <div>
+          <label class="label">4) Pilih KMZ Desain (.kmz)</label>
+          <input id="kmzFile" type="file" accept=".kmz" />
+          <div class="hint">
+            Struktur wajib:
+            <br />
+            DISTRIBUSI → HP → HOME / HOME-BIZ
+            <br />
+            DISTRIBUSI → POLE / FDT / FAT
+          </div>
+        </div>
+
+        <div>
+          <label class="label">5) Pilih ZIP CSV (hasil generator)</label>
+          <input id="csvZip" type="file" accept=".zip" />
+          <div class="hint">
+            ZIP berisi:
+            <b>HOME.csv</b>, <b>HOME-BIZ.csv</b>,
+            <b>POLE.csv</b>, <b>FDT.csv</b>, <b>FAT.csv</b>
+          </div>
+        </div>
+
+        <div>
+          <label class="label">6) Patch KMZ</label>
+          <button id="btnPatchKmz" class="btn" disabled>
+            Generate KMZ Pop-Up
+          </button>
+          <div id="statusKmz" class="hint"></div>
+        </div>
+      </div>
+    </section>
+
     <footer class="muted small">
-      Dibuat untuk workflow: Excel Master Pop Up → 6 CSV.
-      Tidak ada data yang diunggah ke server.
+      Workflow:
+      Excel Master → CSV → Patch KMZ Desain → KMZ Siap Google Earth.
+      <br />
+      Semua proses 100% di browser (aman & tanpa server).
     </footer>
   </div>
 
-  <!-- Libraries (CDN) -->
-  <!-- XLSX: pakai UNPKG (stabil, global XLSX tersedia) -->
+  <!-- ===================== LIBRARIES ===================== -->
+  <!-- XLSX -->
   <script src="https://unpkg.com/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 
   <!-- JSZip -->
