@@ -4,6 +4,7 @@
 // - HOME vs HOME-BIZ ditentukan dari KOLOM TERAKHIR EXCEL (AKURAT)
 // - Category BizPass TETAP nilai ASLI master (TIDAK diubah)
 // - FDT = HANYA 1 BARIS: ambil data POLE "1A" dari Master (lengkap printilan)
+// - FAT = SEMUA POLE KECUALI 1A
 // =====================================================
 
 const $ = (id) => document.getElementById(id);
@@ -142,16 +143,22 @@ btn.addEventListener("click", async () => {
         HOME_HEADERS.map((h) => [h, r[h] || ""])
       );
 
-      // Category BizPass TETAP nilai ASLI
       row["Category BizPass"] = r["Category BizPass"] || "";
 
       if (isBiz) HOME_BIZ.push(row);
       else HOME.push(row);
     });
 
-    // ================= FAT =================
+    // ================= FAT (BUANG 1A) =================
     const FAT = [];
     master.forEach((r) => {
+      const poleId = String(r["Pole ID (New)"] || "")
+        .trim()
+        .toUpperCase();
+
+      // ❌ JANGAN MASUKKAN 1A KE FAT
+      if (poleId === "1A") return;
+
       FAT.push(
         Object.fromEntries(
           FAT_FDT_HEADERS.map((h) => [h, r[h] || ""])
@@ -159,7 +166,7 @@ btn.addEventListener("click", async () => {
       );
     });
 
-    // ================= FDT (FINAL: ambil data POLE 1A dari Master) =================
+    // ================= FDT (AMBIL DATA POLE 1A) =================
     const fdtSource = master.find(
       (r) =>
         String(r["Pole ID (New)"] || "")
@@ -168,7 +175,7 @@ btn.addEventListener("click", async () => {
     );
 
     if (!fdtSource) {
-      throw new Error('Data POLE "1A" tidak ditemukan di Master (Pole ID (New))');
+      throw new Error('Data POLE "1A" tidak ditemukan di Master');
     }
 
     const FDT = [
