@@ -8,7 +8,7 @@ btnPatchKmz.addEventListener("click", async () => {
       await csvZipInput.files[0].arrayBuffer()
     );
 
-    // ===== DETEKSI APAKAH CSV ADA DI ROOT ATAU FOLDER =====
+    // ===== DETEKSI CSV DI ROOT ATAU DALAM FOLDER =====
     const csvFiles = Object.keys(csvZip.files).filter(
       (f) => f.toUpperCase().endsWith(".CSV")
     );
@@ -17,9 +17,8 @@ btnPatchKmz.addEventListener("click", async () => {
       throw new Error("ZIP tidak berisi file CSV");
     }
 
-    // Jika CSV berada dalam folder (misal: BABAT JERAWAT/HOME.csv)
-    const hasFolder = csvFiles.some((f) => f.includes("/"));
-    const basePath = hasFolder
+    // Ambil base path (misal: "BABAT JERAWAT/")
+    const basePath = csvFiles[0].includes("/")
       ? csvFiles[0].substring(0, csvFiles[0].lastIndexOf("/") + 1)
       : "";
 
@@ -46,13 +45,13 @@ btnPatchKmz.addEventListener("click", async () => {
     );
 
     if (!kmlName) {
-      throw new Error("File KML tidak ditemukan di KMZ");
+      throw new Error("File KML tidak ditemukan di dalam KMZ");
     }
 
     const kmlText = await kmz.file(kmlName).async("string");
     const doc = new DOMParser().parseFromString(kmlText, "text/xml");
 
-    // ================= PATCH PER FOLDER =================
+    // ================= PATCH FOLDER =================
     patchFolder(
       doc,
       ["DISTRIBUSI", "HP", "HOME"],
