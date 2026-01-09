@@ -8,43 +8,44 @@
 </head>
 <body>
   <div class="wrap">
+
     <header class="card">
       <h1>Pop Up CSV Generator</h1>
       <p class="muted">
         Upload <b>Excel Master Pop Up</b> → download <b>ZIP</b> berisi
-        6 CSV (HOME, HOME-BIZ, FDT, FAT, HOOK, POLE).
-        Semua proses terjadi di browser (tanpa upload ke server).
+        CSV (HOME, HOME-BIZ, FDT, FAT, POLE).
+        Semua proses terjadi di browser (tanpa server).
       </p>
     </header>
 
-    <!-- ===================== CSV GENERATOR (LAMA) ===================== -->
+    <!-- ===================== CSV GENERATOR ===================== -->
     <section class="card">
       <div class="grid">
         <div>
           <label class="label">1) Pilih file Excel Master Pop Up (.xlsx)</label>
           <input id="file" type="file" accept=".xlsx,.xls" />
           <div class="hint">
-            Sheet yang dipakai: <b>Master Data</b>
-            (kalau tidak ada, akan pakai sheet pertama).
+            Sheet: <b>Master Data</b> (atau sheet pertama).
           </div>
         </div>
 
         <div>
-          <label class="label">2) Nama folder area di dalam ZIP (opsional)</label>
+          <label class="label">2) Nama folder area (opsional)</label>
           <input id="areaName" type="text" placeholder="Contoh: BABAT JERAWAT" />
           <div class="hint">
-            Kalau kosong, akan pakai <b>ID_Area</b> dari file (atau nama file).
+            Jika kosong → pakai <b>ID_Area</b> / nama file.
           </div>
         </div>
 
         <div>
-          <label class="label">3) Generate</label>
+          <label class="label">3) Generate CSV</label>
           <button id="btn" class="btn" disabled>Generate ZIP</button>
           <div id="status" class="hint"></div>
         </div>
       </div>
     </section>
 
+    <!-- ===================== PREVIEW ===================== -->
     <section class="card">
       <h2>Preview</h2>
       <div class="preview">
@@ -52,19 +53,18 @@
         <div class="kv"><span>HOME-BIZ</span><b id="cHomeBiz">-</b></div>
         <div class="kv"><span>FDT</span><b id="cFdt">-</b></div>
         <div class="kv"><span>FAT</span><b id="cFat">-</b></div>
-        <div class="kv"><span>HOOK</span><b id="cHook">-</b></div>
         <div class="kv"><span>POLE</span><b id="cPole">-</b></div>
       </div>
     </section>
 
-    <!-- ===================== PATCH KMZ (BARU) ===================== -->
+    <!-- ===================== PATCH KMZ ===================== -->
     <section class="card">
       <h2>Patch KMZ Desain (Isi Pop-Up Otomatis)</h2>
       <p class="muted">
-        Upload <b>KMZ desain</b> + <b>ZIP CSV</b> (HOME, HOME-BIZ, POLE, FDT, FAT)
-        → download <b>KMZ baru</b> dengan pop-up terisi.
+        Upload <b>KMZ desain</b> + <b>ZIP CSV</b> →
+        download <b>KMZ baru</b> (popup terisi).
         <br />
-        <b>Folder, garis, polygon, style TIDAK DIUBAH.</b>
+        <b>Layer, folder, style TIDAK DIUBAH.</b>
       </p>
 
       <div class="grid">
@@ -72,11 +72,9 @@
           <label class="label">4) Pilih KMZ Desain (.kmz)</label>
           <input id="kmzFile" type="file" accept=".kmz" />
           <div class="hint">
-            Struktur wajib:
-            <br />
-            DISTRIBUSI → HP → HOME / HOME-BIZ
-            <br />
-            DISTRIBUSI → POLE / FDT / FAT
+            Struktur:
+            <br />DISTRIBUSI → HP → HOME / HOME-BIZ
+            <br />DISTRIBUSI → POLE / FDT / FAT
           </div>
         </div>
 
@@ -85,8 +83,7 @@
           <input id="csvZip" type="file" accept=".zip" />
           <div class="hint">
             ZIP berisi:
-            <b>HOME.csv</b>, <b>HOME-BIZ.csv</b>,
-            <b>POLE.csv</b>, <b>FDT.csv</b>, <b>FAT.csv</b>
+            HOME.csv, HOME-BIZ.csv, POLE.csv, FDT.csv, FAT.csv
           </div>
         </div>
 
@@ -102,23 +99,19 @@
 
     <footer class="muted small">
       Workflow:
-      Excel Master → CSV → Patch KMZ Desain → KMZ Siap Google Earth.
+      Excel → CSV → Patch KMZ → Google Earth Ready
       <br />
-      Semua proses 100% di browser (aman & tanpa server).
+      100% client-side.
     </footer>
+
   </div>
 
   <!-- ===================== LIBRARIES ===================== -->
-  <!-- XLSX -->
   <script src="https://unpkg.com/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-
-  <!-- JSZip -->
   <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
-
-  <!-- FileSaver -->
   <script src="https://cdn.jsdelivr.net/npm/file-saver@2.0.5/dist/FileSaver.min.js"></script>
 
-  <!-- App logic -->
+  <!-- APP -->
   <script src="./app.js"></script>
 </body>
 </html>
