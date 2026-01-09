@@ -1,18 +1,32 @@
 // =====================================================
 // POP UP CSV GENERATOR — FINAL TEMPLATE FIX (FULL)
-// FIX UTAMA:
-// - HOME vs HOME-BIZ ditentukan dari KOLOM TERAKHIR EXCEL (AKURAT)
-// - Category BizPass TETAP nilai ASLI master (TIDAK diubah)
-// - FDT = HANYA 1 BARIS: ambil data POLE "1A" dari Master (lengkap printilan)
-// - FAT = SEMUA POLE KECUALI 1A
+// + KMZ PATCHER (CLIENT-SIDE)
+//
+// CSV GENERATOR:
+// - HOME vs HOME-BIZ pakai KOLOM TERAKHIR
+// - Category BizPass tetap ASLI
+// - FDT = hanya POLE 1A
+// - FAT = semua POLE kecuali 1A
+//
+// KMZ PATCHER:
+// - Update popup dari CSV
+// - Mapping BERDASARKAN FOLDER
+// - ID diambil dari <Placemark><name>
 // =====================================================
 
 const $ = (id) => document.getElementById(id);
 
+// ================= ELEMENT =================
 const fileInput = $("file");
 const btn = $("btn");
 const statusEl = $("status");
 
+const kmzFileInput = $("kmzFile");
+const csvZipInput = $("csvZip");
+const btnPatchKmz = $("btnPatchKmz");
+const statusKmz = $("statusKmz");
+
+// ================= CSV GENERATOR =================
 fileInput.addEventListener("change", () => {
   btn.disabled = !fileInput.files.length;
 });
@@ -20,9 +34,7 @@ fileInput.addEventListener("change", () => {
 const SEP = ";";
 const esc = (v) => `"${String(v ?? "").replace(/"/g, '""')}"`;
 
-// ================= TEMPLATE HEADER =================
-
-// FAT & FDT (HEADER SAMA)
+// ================= HEADERS =================
 const FAT_FDT_HEADERS = [
   "Pole ID (New)",
   "Coordinate (Lat) NEW",
@@ -32,7 +44,6 @@ const FAT_FDT_HEADERS = [
   "FAT ID/NETWORK ID",
 ];
 
-// HOME & HOME-BIZ (HEADER SAMA)
 const HOME_HEADERS = [
   "HOMEPASS_ID",
   "CLUSTER_NAME",
@@ -64,7 +75,6 @@ const HOME_HEADERS = [
   "NEED_SURVEY",
 ];
 
-// POLE
 const POLE_HEADERS = [
   "Pole ID (New)",
   "Coordinate (Lat) NEW",
@@ -84,7 +94,7 @@ function toCSV(headers, rows) {
   return out.join("\n");
 }
 
-// ================= MAIN =================
+// ================= GENERATE CSV =================
 btn.addEventListener("click", async () => {
   const file = fileInput.files[0];
   if (!file) return;
@@ -99,84 +109,41 @@ btn.addEventListener("click", async () => {
     const sheetName =
       wb.SheetNames.find((s) => s === "Master Data") || wb.SheetNames[0];
 
-    const worksheet = wb.Sheets[sheetName];
+    const ws = wb.Sheets[sheetName];
 
-    // ================== AMBIL HEADER ASLI EXCEL ==================
-    const headerRow = XLSX.utils.sheet_to_json(worksheet, {
-      header: 1,
-      defval: "",
-    })[0];
+    const headerRow = XLSX.utils.sheet_to_json(ws, { header: 1 })[0];
+    const LAST_COL = headerRow[headerRow.length - 1];
 
-    if (!headerRow || !headerRow.length) {
-      throw new Error("Header Excel tidak terbaca");
-    }
-
-    // NAMA KOLOM TERAKHIR
-    const LAST_COL_NAME = headerRow[headerRow.length - 1];
-
-    // DATA MASTER
-    const master = XLSX.utils.sheet_to_json(worksheet, { defval: "" });
-
-    if (!master.length) throw new Error("Master kosong");
+    const master = XLSX.utils.sheet_to_json(ws, { defval: "" });
 
     const area =
       $("areaName").value ||
       master[0]["ID_Area"] ||
       file.name.replace(/\.(xlsx|xls)$/i, "");
 
-    // ================= HOME / HOME-BIZ =================
     const HOME = [];
     const HOME_BIZ = [];
 
     master.forEach((r) => {
-      const lastVal = String(r[LAST_COL_NAME] || "")
-        .trim()
-        .toUpperCase()
-        .replace(/\s+/g, "");
+      const lastVal = String(r[LAST_COL] || "").toUpperCase();
+      const isBiz = lastVal.includes("BIZ") || lastVal.includes("BIS");
 
-      const isBiz =
-        lastVal.includes("BIZ") ||
-        lastVal.includes("BIS") ||
-        lastVal.includes("BUSINESS");
-
-      const row = Object.fromEntries(
-        HOME_HEADERS.map((h) => [h, r[h] || ""])
-      );
-
+      const row = Object.fromEntries(HOME_HEADERS.map((h) => [h, r[h] || ""]));
       row["Category BizPass"] = r["Category BizPass"] || "";
 
-      if (isBiz) HOME_BIZ.push(row);
-      else HOME.push(row);
+      (isBiz ? HOME_BIZ : HOME).push(row);
     });
 
-    // ================= FAT (BUANG 1A) =================
     const FAT = [];
     master.forEach((r) => {
-      const poleId = String(r["Pole ID (New)"] || "")
-        .trim()
-        .toUpperCase();
-
-      // ❌ JANGAN MASUKKAN 1A KE FAT
-      if (poleId === "1A") return;
-
-      FAT.push(
-        Object.fromEntries(
-          FAT_FDT_HEADERS.map((h) => [h, r[h] || ""])
-        )
-      );
+      if (String(r["Pole ID (New)"]).toUpperCase() === "1A") return;
+      FAT.push(Object.fromEntries(FAT_FDT_HEADERS.map((h) => [h, r[h] || ""])));
     });
 
-    // ================= FDT (AMBIL DATA POLE 1A) =================
     const fdtSource = master.find(
-      (r) =>
-        String(r["Pole ID (New)"] || "")
-          .trim()
-          .toUpperCase() === "1A"
+      (r) => String(r["Pole ID (New)"]).toUpperCase() === "1A"
     );
-
-    if (!fdtSource) {
-      throw new Error('Data POLE "1A" tidak ditemukan di Master');
-    }
+    if (!fdtSource) throw new Error("POLE 1A tidak ditemukan");
 
     const FDT = [
       Object.fromEntries(
@@ -184,17 +151,10 @@ btn.addEventListener("click", async () => {
       ),
     ];
 
-    // ================= POLE =================
-    const POLE = [];
-    master.forEach((r) => {
-      POLE.push(
-        Object.fromEntries(
-          POLE_HEADERS.map((h) => [h, r[h] || ""])
-        )
-      );
-    });
+    const POLE = master.map((r) =>
+      Object.fromEntries(POLE_HEADERS.map((h) => [h, r[h] || ""]))
+    );
 
-    // ================= ZIP =================
     const zip = new JSZip();
     const folder = zip.folder(area);
 
@@ -204,16 +164,107 @@ btn.addEventListener("click", async () => {
     folder.file("FDT.csv", toCSV(FAT_FDT_HEADERS, FDT));
     folder.file("POLE.csv", toCSV(POLE_HEADERS, POLE));
 
-    const blob = await zip.generateAsync({ type: "blob" });
-    saveAs(blob, `${area}_POPUP.zip`);
+    saveAs(await zip.generateAsync({ type: "blob" }), `${area}_POPUP.zip`);
 
-    statusEl.textContent =
-      `SELESAI ✔ HOME=${HOME.length} | HOME-BIZ=${HOME_BIZ.length} | ` +
-      `FAT=${FAT.length} | FDT=1 (Pole 1A) | POLE=${POLE.length}`;
+    statusEl.textContent = "SELESAI ✔ CSV siap";
   } catch (e) {
-    console.error(e);
     statusEl.textContent = "ERROR: " + e.message;
   } finally {
     btn.disabled = false;
+  }
+});
+
+// =====================================================
+// KMZ PATCHER (BARU)
+// =====================================================
+function enablePatchBtn() {
+  btnPatchKmz.disabled = !(kmzFileInput.files.length && csvZipInput.files.length);
+}
+kmzFileInput.addEventListener("change", enablePatchBtn);
+csvZipInput.addEventListener("change", enablePatchBtn);
+
+const norm = (s) => String(s || "").trim().toUpperCase();
+
+function parseCSV(text) {
+  const [h, ...lines] = text.split(/\r?\n/).filter(Boolean);
+  const headers = h.split(";");
+  const rows = lines.map((l) => {
+    const o = {};
+    l.split(";").forEach((v, i) => (o[headers[i]] = v.replace(/^"|"$/g, "")));
+    return o;
+  });
+  return { headers, rows };
+}
+
+function indexBy(rows, key) {
+  const m = new Map();
+  rows.forEach((r) => m.set(norm(r[key]), r));
+  return m;
+}
+
+function patchFolder(doc, path, idx, headers) {
+  let cur = doc.querySelector("Document");
+  for (const p of path) {
+    cur = [...cur.querySelectorAll(":scope>Folder")].find(
+      (f) => norm(f.querySelector("name")?.textContent) === norm(p)
+    );
+    if (!cur) return;
+  }
+
+  cur.querySelectorAll("Placemark").forEach((pm) => {
+    const id = norm(pm.querySelector("name")?.textContent);
+    const row = idx.get(id);
+    if (!row) return;
+
+    pm.querySelector("ExtendedData")?.remove();
+    const ext = doc.createElement("ExtendedData");
+
+    headers.forEach((h) => {
+      const d = doc.createElement("Data");
+      d.setAttribute("name", h);
+      const v = doc.createElement("value");
+      v.textContent = row[h] || "";
+      d.appendChild(v);
+      ext.appendChild(d);
+    });
+    pm.appendChild(ext);
+  });
+}
+
+btnPatchKmz.addEventListener("click", async () => {
+  statusKmz.textContent = "Memproses KMZ...";
+  btnPatchKmz.disabled = true;
+
+  try {
+    const csvZip = await JSZip.loadAsync(await csvZipInput.files[0].arrayBuffer());
+
+    const read = async (n) => parseCSV(await csvZip.file(n).async("string"));
+
+    const HOME = await read("HOME.csv");
+    const HOME_BIZ = await read("HOME-BIZ.csv");
+    const POLE = await read("POLE.csv");
+    const FDT = await read("FDT.csv");
+    const FAT = await read("FAT.csv");
+
+    const kmz = await JSZip.loadAsync(await kmzFileInput.files[0].arrayBuffer());
+    const kmlName = Object.keys(kmz.files).find((f) => f.endsWith(".kml"));
+    const kmlText = await kmz.file(kmlName).async("string");
+
+    const doc = new DOMParser().parseFromString(kmlText, "text/xml");
+
+    patchFolder(doc, ["DISTRIBUSI", "HP", "HOME"], indexBy(HOME.rows, "HOMEPASS_ID"), HOME.headers);
+    patchFolder(doc, ["DISTRIBUSI", "HP", "HOME-BIZ"], indexBy(HOME_BIZ.rows, "HOMEPASS_ID"), HOME_BIZ.headers);
+    patchFolder(doc, ["DISTRIBUSI", "POLE"], indexBy(POLE.rows, "Pole ID (New)"), POLE.headers);
+    patchFolder(doc, ["DISTRIBUSI", "FDT"], indexBy(FDT.rows, "Pole ID (New)"), FDT.headers);
+    patchFolder(doc, ["DISTRIBUSI", "FAT"], indexBy(FAT.rows, "Pole ID (New)"), FAT.headers);
+
+    kmz.file(kmlName, new XMLSerializer().serializeToString(doc));
+
+    saveAs(await kmz.generateAsync({ type: "blob" }), "KMZ_POPUP_FINAL.kmz");
+    statusKmz.textContent = "SELESAI ✔ KMZ siap dipakai";
+  } catch (e) {
+    statusKmz.textContent = "ERROR: " + e.message;
+  } finally {
+    enablePatchBtn();
   }
 });
