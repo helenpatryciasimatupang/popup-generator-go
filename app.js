@@ -98,71 +98,7 @@ document.addEventListener("DOMContentLoaded", () => {
   ];
 
   // =====================================================
-  // CSV GENERATOR
-  // =====================================================
-  if (btnGenCSV) {
-    btnGenCSV.addEventListener("click", async () => {
-      statusCSV.textContent = "Memproses Master Excel...";
-      btnGenCSV.disabled = true;
-
-      try {
-        const buf = await fileInput.files[0].arrayBuffer();
-        const wb = XLSX.read(buf, { type: "array" });
-        const sheetName = wb.SheetNames.includes("Master Data")
-          ? "Master Data"
-          : wb.SheetNames[0];
-        const ws = wb.Sheets[sheetName];
-
-        const headerRow = XLSX.utils.sheet_to_json(ws, { header:1 })[0];
-        const LAST_COL = headerRow[headerRow.length-1];
-
-        const master = XLSX.utils.sheet_to_json(ws, { defval:"" });
-        const area = areaInput.value || master[0]["ID_Area"] || "AREA";
-
-        const HOME = [], HOME_BIZ = [];
-        master.forEach(r=>{
-          const isBiz = String(r[LAST_COL]).toUpperCase().includes("BIZ");
-          const row = Object.fromEntries(HOME_HEADERS.map(h=>[h,r[h]||""]));
-          row["Category BizPass"] = r["Category BizPass"] || "";
-          (isBiz ? HOME_BIZ : HOME).push(row);
-        });
-
-        const FAT = [];
-        master.forEach(r=>{
-          if (norm(r["Pole ID (New)"])==="1A") return;
-          FAT.push(Object.fromEntries(FAT_FDT_HEADERS.map(h=>[h,r[h]||""])));
-        });
-
-        const fdtSource = master.find(r=>norm(r["Pole ID (New)"])==="1A");
-        if (!fdtSource) throw new Error("POLE 1A tidak ditemukan");
-        const FDT = [
-          Object.fromEntries(FAT_FDT_HEADERS.map(h=>[h,fdtSource[h]||""]))
-        ];
-
-        const POLE = master.map(r =>
-          Object.fromEntries(POLE_HEADERS.map(h=>[h,r[h]||""]))
-        );
-
-        const zip = new JSZip();
-        const folder = zip.folder(area);
-        folder.file("HOME.csv", toCSV(HOME_HEADERS, HOME));
-        folder.file("HOME-BIZ.csv", toCSV(HOME_HEADERS, HOME_BIZ));
-        folder.file("FAT.csv", toCSV(FAT_FDT_HEADERS, FAT));
-        folder.file("FDT.csv", toCSV(FAT_FDT_HEADERS, FDT));
-        folder.file("POLE.csv", toCSV(POLE_HEADERS, POLE));
-
-        saveAs(await zip.generateAsync({type:"blob"}), `${area}_POPUP.zip`);
-        statusCSV.textContent = "SELESAI ✔ CSV siap";
-      } catch(e){
-        statusCSV.textContent = "ERROR: " + e.message;
-      } finally {
-        btnGenCSV.disabled = false;
-      }
-    });
-  }
-
-  // =====================================================
-  // PATCH FOLDER — POPUP NATIF GOOGLE EARTH (FINAL)
+  // PATCH FOLDER — GOOGLE EARTH NATIVE POPUP (FIX)
   // =====================================================
   function patchFolder(doc, path, idx, headers) {
     let cur = doc.querySelector("Document");
@@ -173,24 +109,31 @@ document.addEventListener("DOMContentLoaded", () => {
       if (!cur) return;
     }
 
-    cur.querySelectorAll("Placemark").forEach(pm=>{
+    cur.querySelectorAll("Placemark").forEach(pm => {
       const id = norm(pm.querySelector("name")?.textContent);
       const row = idx.get(id);
       if (!row) return;
 
-      // BERSIHKAN POPUP LAMA
+      // bersihkan popup lama
       pm.querySelector("description")?.remove();
       pm.querySelector("styleUrl")?.remove();
       pm.querySelector("Style")?.remove();
       pm.querySelector("ExtendedData")?.remove();
 
-      // BUAT POPUP NATIF
       const ext = doc.createElement("ExtendedData");
-      headers.forEach(h=>{
+
+      headers.forEach(h => {
         const d = doc.createElement("Data");
         d.setAttribute("name", h);
+
+        // 🔴 INI YANG PALING PENTING
+        const display = doc.createElement("displayName");
+        display.textContent = h;
+
         const v = doc.createElement("value");
-        v.textContent = row[h] || "";
+        v.textContent = row[h] ?? "";
+
+        d.appendChild(display);
         d.appendChild(v);
         ext.appendChild(d);
       });
@@ -202,7 +145,7 @@ document.addEventListener("DOMContentLoaded", () => {
   // =====================================================
   // PATCH KMZ
   // =====================================================
-  btnPatchKmz.addEventListener("click", async ()=>{
+  btnPatchKmz.addEventListener("click", async ()=> {
     statusKmz.textContent = "Memproses KMZ...";
     btnPatchKmz.disabled = true;
 
@@ -212,13 +155,16 @@ document.addEventListener("DOMContentLoaded", () => {
       );
 
       const csvFiles = Object.keys(csvZip.files)
-        .filter(f=>f.toUpperCase().endsWith(".CSV"));
+        .filter(f => f.toUpperCase().endsWith(".CSV"));
+
+      if (!csvFiles.length) throw new Error("ZIP tidak berisi CSV");
+
       const basePath = csvFiles[0].includes("/")
         ? csvFiles[0].split("/")[0] + "/"
         : "";
 
       const readCSV = async n =>
-        parseCSV(await csvZip.file(basePath+n).async("string"));
+        parseCSV(await csvZip.file(basePath + n).async("string"));
 
       const HOME     = await readCSV("HOME.csv");
       const HOME_BIZ = await readCSV("HOME-BIZ.csv");
@@ -230,22 +176,26 @@ document.addEventListener("DOMContentLoaded", () => {
         await kmzFileInput.files[0].arrayBuffer()
       );
 
-      const kmlName = Object.keys(kmz.files).find(f=>f.endsWith(".kml"));
+      const kmlName = Object.keys(kmz.files).find(f => f.endsWith(".kml"));
+      if (!kmlName) throw new Error("KML tidak ditemukan");
+
       const doc = new DOMParser().parseFromString(
-        await kmz.file(kmlName).async("string"), "text/xml"
+        await kmz.file(kmlName).async("string"),
+        "text/xml"
       );
 
-      patchFolder(doc,["DISTRIBUSI","HP","HOME"],indexBy(HOME.rows,"HOMEPASS_ID"),HOME.headers);
-      patchFolder(doc,["DISTRIBUSI","HP","HOME-BIZ"],indexBy(HOME_BIZ.rows,"HOMEPASS_ID"),HOME_BIZ.headers);
-      patchFolder(doc,["DISTRIBUSI","POLE"],indexBy(POLE.rows,"Pole ID (New)"),POLE.headers);
-      patchFolder(doc,["DISTRIBUSI","FDT"],indexBy(FDT.rows,"Pole ID (New)"),FDT.headers);
-      patchFolder(doc,["DISTRIBUSI","FAT"],indexBy(FAT.rows,"Pole ID (New)"),FAT.headers);
+      patchFolder(doc, ["DISTRIBUSI","HP","HOME"], indexBy(HOME.rows,"HOMEPASS_ID"), HOME.headers);
+      patchFolder(doc, ["DISTRIBUSI","HP","HOME-BIZ"], indexBy(HOME_BIZ.rows,"HOMEPASS_ID"), HOME_BIZ.headers);
+      patchFolder(doc, ["DISTRIBUSI","POLE"], indexBy(POLE.rows,"Pole ID (New)"), POLE.headers);
+      patchFolder(doc, ["DISTRIBUSI","FDT"], indexBy(FDT.rows,"Pole ID (New)"), FDT.headers);
+      patchFolder(doc, ["DISTRIBUSI","FAT"], indexBy(FAT.rows,"Pole ID (New)"), FAT.headers);
 
       kmz.file(kmlName, new XMLSerializer().serializeToString(doc));
-      saveAs(await kmz.generateAsync({type:"blob"}), "KMZ_POPUP_FINAL.kmz");
+      saveAs(await kmz.generateAsync({ type:"blob" }), "KMZ_POPUP_FINAL.kmz");
 
       statusKmz.textContent = "SELESAI ✔ KMZ siap dipakai";
-    } catch(e){
+    } catch(e) {
+      console.error(e);
       statusKmz.textContent = "ERROR: " + e.message;
     } finally {
       enablePatchBtn();
