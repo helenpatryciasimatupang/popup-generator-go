@@ -16,7 +16,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const statusKmz    = $("statusKmz");
 
   // =====================================================
-  // ENABLE BUTTONS
+  // ENABLE BUTTON
   // =====================================================
   if (fileInput && btnGenCSV) {
     fileInput.addEventListener("change", () => {
@@ -26,8 +26,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function enablePatchBtn() {
     btnPatchKmz.disabled = !(
-      kmzFileInput.files.length > 0 &&
-      csvZipInput.files.length > 0
+      kmzFileInput.files.length &&
+      csvZipInput.files.length
     );
   }
   kmzFileInput.addEventListener("change", enablePatchBtn);
@@ -43,7 +43,9 @@ document.addEventListener("DOMContentLoaded", () => {
   function toCSV(headers, rows) {
     const out = [];
     out.push(headers.map(esc).join(SEP));
-    rows.forEach(r => out.push(headers.map(h => esc(r[h] || "")).join(SEP)));
+    rows.forEach(r => {
+      out.push(headers.map(h => esc(r[h] || "")).join(SEP));
+    });
     return out.join("\n");
   }
 
@@ -52,7 +54,9 @@ document.addEventListener("DOMContentLoaded", () => {
     const headers = h.split(";").map(x => x.replace(/^"|"$/g, ""));
     const rows = lines.map(l => {
       const o = {};
-      l.split(";").forEach((v,i)=> o[headers[i]] = v.replace(/^"|"$/g,""));
+      l.split(";").forEach((v,i)=>{
+        o[headers[i]] = v.replace(/^"|"$/g,"");
+      });
       return o;
     });
     return { headers, rows };
@@ -104,7 +108,9 @@ document.addEventListener("DOMContentLoaded", () => {
       try {
         const buf = await fileInput.files[0].arrayBuffer();
         const wb = XLSX.read(buf, { type: "array" });
-        const sheetName = wb.SheetNames.includes("Master Data") ? "Master Data" : wb.SheetNames[0];
+        const sheetName = wb.SheetNames.includes("Master Data")
+          ? "Master Data"
+          : wb.SheetNames[0];
         const ws = wb.Sheets[sheetName];
 
         const headerRow = XLSX.utils.sheet_to_json(ws, { header:1 })[0];
@@ -113,29 +119,29 @@ document.addEventListener("DOMContentLoaded", () => {
         const master = XLSX.utils.sheet_to_json(ws, { defval:"" });
         const area = areaInput.value || master[0]["ID_Area"] || "AREA";
 
-        // HOME / HOME-BIZ
         const HOME = [], HOME_BIZ = [];
         master.forEach(r=>{
           const isBiz = String(r[LAST_COL]).toUpperCase().includes("BIZ");
           const row = Object.fromEntries(HOME_HEADERS.map(h=>[h,r[h]||""]));
           row["Category BizPass"] = r["Category BizPass"] || "";
-          (isBiz?HOME_BIZ:HOME).push(row);
+          (isBiz ? HOME_BIZ : HOME).push(row);
         });
 
-        // FAT (tanpa 1A)
         const FAT = [];
         master.forEach(r=>{
           if (norm(r["Pole ID (New)"])==="1A") return;
           FAT.push(Object.fromEntries(FAT_FDT_HEADERS.map(h=>[h,r[h]||""])));
         });
 
-        // FDT (hanya 1A)
         const fdtSource = master.find(r=>norm(r["Pole ID (New)"])==="1A");
         if (!fdtSource) throw new Error("POLE 1A tidak ditemukan");
-        const FDT = [Object.fromEntries(FAT_FDT_HEADERS.map(h=>[h,fdtSource[h]||""]))];
+        const FDT = [
+          Object.fromEntries(FAT_FDT_HEADERS.map(h=>[h,fdtSource[h]||""]))
+        ];
 
-        // POLE
-        const POLE = master.map(r=>Object.fromEntries(POLE_HEADERS.map(h=>[h,r[h]||""])));
+        const POLE = master.map(r =>
+          Object.fromEntries(POLE_HEADERS.map(h=>[h,r[h]||""]))
+        );
 
         const zip = new JSZip();
         const folder = zip.folder(area);
@@ -156,13 +162,13 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   // =====================================================
-  // PATCH FOLDER (POP-UP FINAL TANPA GAMBAR)
+  // PATCH FOLDER — POPUP NATIF GOOGLE EARTH (FINAL)
   // =====================================================
   function patchFolder(doc, path, idx, headers) {
     let cur = doc.querySelector("Document");
     for (const p of path) {
       cur = [...cur.querySelectorAll(":scope > Folder")].find(
-        f => f.querySelector("name")?.textContent.trim().toUpperCase() === p.toUpperCase()
+        f => norm(f.querySelector("name")?.textContent) === norm(p)
       );
       if (!cur) return;
     }
@@ -172,23 +178,24 @@ document.addEventListener("DOMContentLoaded", () => {
       const row = idx.get(id);
       if (!row) return;
 
+      // BERSIHKAN POPUP LAMA
       pm.querySelector("description")?.remove();
       pm.querySelector("styleUrl")?.remove();
+      pm.querySelector("Style")?.remove();
       pm.querySelector("ExtendedData")?.remove();
 
-      let html = `<table border="1" style="border-collapse:collapse;font-size:12px">`;
+      // BUAT POPUP NATIF
+      const ext = doc.createElement("ExtendedData");
       headers.forEach(h=>{
-        html += `<tr><td><b>${h}</b></td><td>${row[h]??""}</td></tr>`;
+        const d = doc.createElement("Data");
+        d.setAttribute("name", h);
+        const v = doc.createElement("value");
+        v.textContent = row[h] || "";
+        d.appendChild(v);
+        ext.appendChild(d);
       });
-      html += `</table>`;
 
-      const style = doc.createElement("Style");
-      const balloon = doc.createElement("BalloonStyle");
-      const text = doc.createElement("text");
-      text.textContent = `<![CDATA[${html}]]>`;
-      balloon.appendChild(text);
-      style.appendChild(balloon);
-      pm.appendChild(style);
+      pm.appendChild(ext);
     });
   }
 
@@ -200,20 +207,33 @@ document.addEventListener("DOMContentLoaded", () => {
     btnPatchKmz.disabled = true;
 
     try {
-      const csvZip = await JSZip.loadAsync(await csvZipInput.files[0].arrayBuffer());
-      const csvFiles = Object.keys(csvZip.files).filter(f=>f.toUpperCase().endsWith(".CSV"));
-      const basePath = csvFiles[0].includes("/") ? csvFiles[0].split("/")[0]+"/" : "";
+      const csvZip = await JSZip.loadAsync(
+        await csvZipInput.files[0].arrayBuffer()
+      );
 
-      const readCSV = async n => parseCSV(await csvZip.file(basePath+n).async("string"));
-      const HOME = await readCSV("HOME.csv");
+      const csvFiles = Object.keys(csvZip.files)
+        .filter(f=>f.toUpperCase().endsWith(".CSV"));
+      const basePath = csvFiles[0].includes("/")
+        ? csvFiles[0].split("/")[0] + "/"
+        : "";
+
+      const readCSV = async n =>
+        parseCSV(await csvZip.file(basePath+n).async("string"));
+
+      const HOME     = await readCSV("HOME.csv");
       const HOME_BIZ = await readCSV("HOME-BIZ.csv");
-      const POLE = await readCSV("POLE.csv");
-      const FDT = await readCSV("FDT.csv");
-      const FAT = await readCSV("FAT.csv");
+      const POLE     = await readCSV("POLE.csv");
+      const FDT      = await readCSV("FDT.csv");
+      const FAT      = await readCSV("FAT.csv");
 
-      const kmz = await JSZip.loadAsync(await kmzFileInput.files[0].arrayBuffer());
+      const kmz = await JSZip.loadAsync(
+        await kmzFileInput.files[0].arrayBuffer()
+      );
+
       const kmlName = Object.keys(kmz.files).find(f=>f.endsWith(".kml"));
-      const doc = new DOMParser().parseFromString(await kmz.file(kmlName).async("string"),"text/xml");
+      const doc = new DOMParser().parseFromString(
+        await kmz.file(kmlName).async("string"), "text/xml"
+      );
 
       patchFolder(doc,["DISTRIBUSI","HP","HOME"],indexBy(HOME.rows,"HOMEPASS_ID"),HOME.headers);
       patchFolder(doc,["DISTRIBUSI","HP","HOME-BIZ"],indexBy(HOME_BIZ.rows,"HOMEPASS_ID"),HOME_BIZ.headers);
@@ -221,11 +241,12 @@ document.addEventListener("DOMContentLoaded", () => {
       patchFolder(doc,["DISTRIBUSI","FDT"],indexBy(FDT.rows,"Pole ID (New)"),FDT.headers);
       patchFolder(doc,["DISTRIBUSI","FAT"],indexBy(FAT.rows,"Pole ID (New)"),FAT.headers);
 
-      kmz.file(kmlName,new XMLSerializer().serializeToString(doc));
-      saveAs(await kmz.generateAsync({type:"blob"}),"KMZ_POPUP_FINAL.kmz");
+      kmz.file(kmlName, new XMLSerializer().serializeToString(doc));
+      saveAs(await kmz.generateAsync({type:"blob"}), "KMZ_POPUP_FINAL.kmz");
+
       statusKmz.textContent = "SELESAI ✔ KMZ siap dipakai";
     } catch(e){
-      statusKmz.textContent = "ERROR: "+e.message;
+      statusKmz.textContent = "ERROR: " + e.message;
     } finally {
       enablePatchBtn();
     }
