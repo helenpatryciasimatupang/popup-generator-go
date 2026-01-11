@@ -5,24 +5,10 @@ document.addEventListener("DOMContentLoaded", () => {
   // =====================================================
   const $ = (id) => document.getElementById(id);
 
-  const fileInput   = $("file");
-  const areaInput   = $("areaName");
-  const btnGenCSV   = $("btn");
-  const statusCSV   = $("status");
-
   const kmzFileInput = $("kmzFile");
   const csvZipInput  = $("csvZip");
   const btnPatchKmz  = $("btnPatchKmz");
   const statusKmz    = $("statusKmz");
-
-  // =====================================================
-  // ENABLE BUTTON
-  // =====================================================
-  if (fileInput && btnGenCSV) {
-    fileInput.addEventListener("change", () => {
-      btnGenCSV.disabled = !fileInput.files.length;
-    });
-  }
 
   function enablePatchBtn() {
     btnPatchKmz.disabled = !(
@@ -36,27 +22,14 @@ document.addEventListener("DOMContentLoaded", () => {
   // =====================================================
   // HELPERS
   // =====================================================
-  const SEP = ";";
-  const esc = (v) => `"${String(v ?? "").replace(/"/g, '""')}"`;
   const norm = (s) => String(s || "").trim().toUpperCase();
-
-  function toCSV(headers, rows) {
-    const out = [];
-    out.push(headers.map(esc).join(SEP));
-    rows.forEach(r => {
-      out.push(headers.map(h => esc(r[h] || "")).join(SEP));
-    });
-    return out.join("\n");
-  }
 
   function parseCSV(text) {
     const [h, ...lines] = text.split(/\r?\n/).filter(Boolean);
     const headers = h.split(";").map(x => x.replace(/^"|"$/g, ""));
     const rows = lines.map(l => {
       const o = {};
-      l.split(";").forEach((v,i)=>{
-        o[headers[i]] = v.replace(/^"|"$/g,"");
-      });
+      l.split(";").forEach((v,i)=> o[headers[i]] = v.replace(/^"|"$/g,""));
       return o;
     });
     return { headers, rows };
@@ -69,38 +42,21 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   // =====================================================
-  // HEADERS
+  // SCHEMA FIELD MAP (HARUS SAMA DENGAN KMZ CONTOH)
   // =====================================================
-  const FAT_FDT_HEADERS = [
-    "Pole ID (New)",
-    "Coordinate (Lat) NEW",
-    "Coordinate (Long) NEW",
-    "Pole Provider (New)",
-    "Pole Type",
-    "FAT ID/NETWORK ID",
-  ];
-
-  const HOME_HEADERS = [
-    "HOMEPASS_ID","CLUSTER_NAME","PREFIX_ADDRESS","STREET_NAME","HOUSE_NUMBER",
-    "BLOCK","FLOOR","RT","RW","DISTRICT","SUB_DISTRICT","FDT_CODE","FAT_CODE",
-    "BUILDING_LATITUDE","BUILDING_LONGITUDE","Category BizPass","POST CODE",
-    "ADDRESS POLE / FAT","OV_UG","HOUSE_COMMENT_","BUILDING_NAME","TOWER","APTN",
-    "FIBER_NODE__HFC_","ID_Area","Clamp_Hook_ID","DEPLOYMENT_TYPE","NEED_SURVEY",
-  ];
-
-  const POLE_HEADERS = [
-    "Pole ID (New)",
-    "Coordinate (Lat) NEW",
-    "Coordinate (Long) NEW",
-    "Pole Provider (New)",
-    "Pole Type",
-    "LINE",
-  ];
+  const SCHEMA_MAP = {
+    HOME: "HOME",
+    "HOME-BIZ": "HOME_BIZ",
+    POLE: "POLE",
+    FDT: "FDT",
+    FAT: "FAT"
+  };
 
   // =====================================================
-  // PATCH FOLDER — GOOGLE EARTH NATIVE POPUP (FIX)
+  // PATCH FOLDER (SCHEMA-BASED, GOOGLE EARTH NATIVE)
   // =====================================================
-  function patchFolder(doc, path, idx, headers) {
+  function patchFolder(doc, path, idx, schemaId) {
+
     let cur = doc.querySelector("Document");
     for (const p of path) {
       cur = [...cur.querySelectorAll(":scope > Folder")].find(
@@ -114,30 +70,23 @@ document.addEventListener("DOMContentLoaded", () => {
       const row = idx.get(id);
       if (!row) return;
 
-      // bersihkan popup lama
+      // HAPUS SEMUA POPUP LAMA
       pm.querySelector("description")?.remove();
-      pm.querySelector("styleUrl")?.remove();
-      pm.querySelector("Style")?.remove();
       pm.querySelector("ExtendedData")?.remove();
 
+      // BANGUN SchemaData (INI KUNCI)
       const ext = doc.createElement("ExtendedData");
+      const schemaData = doc.createElement("SchemaData");
+      schemaData.setAttribute("schemaUrl", `#${schemaId}`);
 
-      headers.forEach(h => {
-        const d = doc.createElement("Data");
-        d.setAttribute("name", h);
-
-        // 🔴 INI YANG PALING PENTING
-        const display = doc.createElement("displayName");
-        display.textContent = h;
-
-        const v = doc.createElement("value");
-        v.textContent = row[h] ?? "";
-
-        d.appendChild(display);
-        d.appendChild(v);
-        ext.appendChild(d);
+      Object.entries(row).forEach(([k,v])=>{
+        const sd = doc.createElement("SimpleData");
+        sd.setAttribute("name", k.replace(/[^A-Za-z0-9_]/g,"_"));
+        sd.textContent = v ?? "";
+        schemaData.appendChild(sd);
       });
 
+      ext.appendChild(schemaData);
       pm.appendChild(ext);
     });
   }
@@ -150,21 +99,21 @@ document.addEventListener("DOMContentLoaded", () => {
     btnPatchKmz.disabled = true;
 
     try {
+      // ===== LOAD CSV ZIP =====
       const csvZip = await JSZip.loadAsync(
         await csvZipInput.files[0].arrayBuffer()
       );
 
       const csvFiles = Object.keys(csvZip.files)
         .filter(f => f.toUpperCase().endsWith(".CSV"));
-
       if (!csvFiles.length) throw new Error("ZIP tidak berisi CSV");
 
       const basePath = csvFiles[0].includes("/")
         ? csvFiles[0].split("/")[0] + "/"
         : "";
 
-      const readCSV = async n =>
-        parseCSV(await csvZip.file(basePath + n).async("string"));
+      const readCSV = async (n) =>
+        parseCSV(await csvZip.file(basePath+n).async("string"));
 
       const HOME     = await readCSV("HOME.csv");
       const HOME_BIZ = await readCSV("HOME-BIZ.csv");
@@ -172,6 +121,7 @@ document.addEventListener("DOMContentLoaded", () => {
       const FDT      = await readCSV("FDT.csv");
       const FAT      = await readCSV("FAT.csv");
 
+      // ===== LOAD KMZ =====
       const kmz = await JSZip.loadAsync(
         await kmzFileInput.files[0].arrayBuffer()
       );
@@ -184,16 +134,37 @@ document.addEventListener("DOMContentLoaded", () => {
         "text/xml"
       );
 
-      patchFolder(doc, ["DISTRIBUSI","HP","HOME"], indexBy(HOME.rows,"HOMEPASS_ID"), HOME.headers);
-      patchFolder(doc, ["DISTRIBUSI","HP","HOME-BIZ"], indexBy(HOME_BIZ.rows,"HOMEPASS_ID"), HOME_BIZ.headers);
-      patchFolder(doc, ["DISTRIBUSI","POLE"], indexBy(POLE.rows,"Pole ID (New)"), POLE.headers);
-      patchFolder(doc, ["DISTRIBUSI","FDT"], indexBy(FDT.rows,"Pole ID (New)"), FDT.headers);
-      patchFolder(doc, ["DISTRIBUSI","FAT"], indexBy(FAT.rows,"Pole ID (New)"), FAT.headers);
+      // ===== PATCH (SCHEMA MODE) =====
+      patchFolder(doc, ["DISTRIBUSI","HP","HOME"],
+        indexBy(HOME.rows,"HOMEPASS_ID"),
+        SCHEMA_MAP.HOME
+      );
 
+      patchFolder(doc, ["DISTRIBUSI","HP","HOME-BIZ"],
+        indexBy(HOME_BIZ.rows,"HOMEPASS_ID"),
+        SCHEMA_MAP["HOME-BIZ"]
+      );
+
+      patchFolder(doc, ["DISTRIBUSI","POLE"],
+        indexBy(POLE.rows,"Pole ID (New)"),
+        SCHEMA_MAP.POLE
+      );
+
+      patchFolder(doc, ["DISTRIBUSI","FDT"],
+        indexBy(FDT.rows,"Pole ID (New)"),
+        SCHEMA_MAP.FDT
+      );
+
+      patchFolder(doc, ["DISTRIBUSI","FAT"],
+        indexBy(FAT.rows,"Pole ID (New)"),
+        SCHEMA_MAP.FAT
+      );
+
+      // ===== SAVE =====
       kmz.file(kmlName, new XMLSerializer().serializeToString(doc));
-      saveAs(await kmz.generateAsync({ type:"blob" }), "KMZ_POPUP_FINAL.kmz");
+      saveAs(await kmz.generateAsync({type:"blob"}), "KMZ_POPUP_FINAL.kmz");
 
-      statusKmz.textContent = "SELESAI ✔ KMZ siap dipakai";
+      statusKmz.textContent = "SELESAI ✔ POPUP IDENTIK DESAIN";
     } catch(e) {
       console.error(e);
       statusKmz.textContent = "ERROR: " + e.message;
