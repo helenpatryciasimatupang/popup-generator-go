@@ -12,13 +12,69 @@
     <header class="card">
       <h1>Pop Up CSV Generator</h1>
       <p class="muted">
-        Upload <b>Excel Master Pop Up</b> → download <b>ZIP</b> berisi
-        CSV (HOME, HOME-BIZ, FDT, FAT, POLE).
+        DATA BASE → MASTER POP UP → CSV → KMZ<br/>
         Semua proses terjadi di browser (tanpa server).
       </p>
     </header>
 
-    <!-- ===================== CSV GENERATOR ===================== -->
+    <!-- ========================================================= -->
+    <!-- DATA BASE → MASTER POP UP (BARU) -->
+    <!-- ========================================================= -->
+    <section class="card">
+      <h2>Generate MASTER POP UP (Dari DATA BASE)</h2>
+      <p class="muted">
+        Upload <b>Excel DATA BASE</b> → download <b>MASTER POP UP.xlsx</b><br/>
+        Format & isi <b>IDENTIK</b> dengan Master Pop Up standar desain.
+      </p>
+
+      <div class="grid">
+        <div>
+          <label class="label">A) Pilih Excel DATA BASE (.xlsx)</label>
+          <input id="dbFile" type="file" accept=".xlsx,.xls" />
+          <div class="hint">1 sheet (FolderPath, Name, X, Y)</div>
+        </div>
+
+        <div>
+          <label class="label">B) Nama Area / Cluster</label>
+          <input id="dbArea" type="text" placeholder="BABAT JERAWAT" />
+        </div>
+
+        <div>
+          <label class="label">C) District</label>
+          <input id="dbDistrict" type="text" placeholder="PAKAL" />
+        </div>
+
+        <div>
+          <label class="label">D) Sub District</label>
+          <input id="dbSubDistrict" type="text" placeholder="BABAT JERAWAT" />
+        </div>
+
+        <div>
+          <label class="label">E) Post Code</label>
+          <input id="dbPostCode" type="text" placeholder="60197" />
+        </div>
+
+        <div>
+          <label class="label">F) FDT Code</label>
+          <input id="dbFdtCode" type="text" placeholder="FBS05300" />
+        </div>
+
+        <div>
+          <label class="label">G) ID Area</label>
+          <input id="dbIdArea" type="text" placeholder="LN35SBY0042AS-01" />
+        </div>
+
+        <div>
+          <label class="label">H) Generate</label>
+          <button id="btnGenMaster" class="btn">Generate MASTER POP UP</button>
+          <div id="statusMaster" class="hint"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========================================================= -->
+    <!-- CSV GENERATOR (LAMA - TIDAK DIUBAH) -->
+    <!-- ========================================================= -->
     <section class="card">
       <div class="grid">
         <div>
@@ -71,20 +127,11 @@
         <div>
           <label class="label">4) Pilih KMZ Desain (.kmz)</label>
           <input id="kmzFile" type="file" accept=".kmz" />
-          <div class="hint">
-            Struktur:
-            <br />DISTRIBUSI → HP → HOME / HOME-BIZ
-            <br />DISTRIBUSI → POLE / FDT / FAT
-          </div>
         </div>
 
         <div>
           <label class="label">5) Pilih ZIP CSV (hasil generator)</label>
           <input id="csvZip" type="file" accept=".zip" />
-          <div class="hint">
-            ZIP berisi:
-            HOME.csv, HOME-BIZ.csv, POLE.csv, FDT.csv, FAT.csv
-          </div>
         </div>
 
         <div>
@@ -98,8 +145,8 @@
     </section>
 
     <footer class="muted small">
-      Workflow:
-      Excel → CSV → Patch KMZ → Google Earth Ready
+      Workflow resmi desain:
+      DATA BASE → MASTER POP UP → CSV → KMZ
       <br />
       100% client-side.
     </footer>
