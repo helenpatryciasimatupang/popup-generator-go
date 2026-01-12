@@ -1,26 +1,32 @@
 document.addEventListener("DOMContentLoaded", () => {
 
   // =====================================================
-  // ELEMENT
+  // ELEMENT (FIXED – SESUAI index.html)
   // =====================================================
   const $ = (id) => document.getElementById(id);
 
-  const fileDB       = $("file");          // DATA BASE
-  const btnMaster    = $("btnMaster");     // Generate MASTER POP UP
-  const btnCSV       = $("btn");            // Generate CSV
-  const status       = $("status");
+  // === DATA BASE → MASTER POP UP
+  const fileDB        = $("dbFile");
+  const btnMaster     = $("btnGenMaster");
+  const statusMaster  = $("statusMaster");
 
-  const areaInput    = $("areaName");
-  const districtIn   = $("district");
-  const subDistrictIn= $("subdistrict");
-  const postCodeIn   = $("postcode");
-  const fdtIn        = $("fdtcode");
-  const idAreaIn     = $("idarea");
+  const areaInput     = $("dbArea");
+  const districtIn    = $("dbDistrict");
+  const subDistrictIn = $("dbSubDistrict");
+  const postCodeIn    = $("dbPostCode");
+  const fdtIn         = $("dbFdtCode");
+  const idAreaIn      = $("dbIdArea");
 
-  const kmzFileInput = $("kmzFile");
-  const csvZipInput  = $("csvZip");
-  const btnPatchKmz  = $("btnPatchKmz");
-  const statusKmz    = $("statusKmz");
+  // === CSV GENERATOR (LAMA)
+  const fileMasterCSV = $("file");
+  const btnCSV        = $("btn");
+  const statusCSV     = $("status");
+
+  // === PATCH KMZ
+  const kmzFileInput  = $("kmzFile");
+  const csvZipInput   = $("csvZip");
+  const btnPatchKmz   = $("btnPatchKmz");
+  const statusKmz     = $("statusKmz");
 
   // =====================================================
   // HELPERS
@@ -29,17 +35,21 @@ document.addEventListener("DOMContentLoaded", () => {
   const raw  = (s) => String(s || "").trim();
 
   // =====================================================
-  // ================== 1️⃣ DATA BASE → MASTER POP UP
+  // 1️⃣ DATA BASE → MASTER POP UP
   // =====================================================
-  btnMaster?.addEventListener("click", async () => {
+  btnMaster.addEventListener("click", async () => {
+    if (!fileDB.files.length) {
+      statusMaster.textContent = "ERROR: File DATA BASE belum dipilih";
+      return;
+    }
 
-    status.textContent = "Memproses DATA BASE → MASTER POP UP...";
+    statusMaster.textContent = "Memproses DATA BASE → MASTER POP UP...";
 
     try {
-      const buf = await fileDB.files[0].arrayBuffer();
-      const wb  = XLSX.read(buf, { type: "array" });
-      const ws  = wb.Sheets[wb.SheetNames[0]];
-      const rows= XLSX.utils.sheet_to_json(ws, { defval:"" });
+      const buf  = await fileDB.files[0].arrayBuffer();
+      const wb   = XLSX.read(buf, { type: "array" });
+      const ws   = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws, { defval: "" });
 
       const HOME = [];
       const HOME_BIZ = [];
@@ -49,9 +59,8 @@ document.addEventListener("DOMContentLoaded", () => {
         const folder = raw(r.FolderPath);
         const name   = raw(r.Name);
 
-        // ========= HOME / HOME-BIZ =========
+        // ================= HOME / HOME-BIZ =================
         if (folder.includes("/HOME")) {
-
           const isBiz = folder.includes("HOME-BIZ");
           const street = folder.split("/").slice(-2)[0];
 
@@ -92,7 +101,7 @@ document.addEventListener("DOMContentLoaded", () => {
           isBiz ? HOME_BIZ.push(row) : HOME.push(row);
         }
 
-        // ========= POLE =========
+        // ================= POLE =================
         if (folder.includes("/POLE")) {
           POLE.push({
             "Pole ID (New)": name,
@@ -111,89 +120,14 @@ document.addEventListener("DOMContentLoaded", () => {
       XLSX.utils.book_append_sheet(wbOut, XLSX.utils.json_to_sheet(HOME_BIZ), "HOME-BIZ");
       XLSX.utils.book_append_sheet(wbOut, XLSX.utils.json_to_sheet(POLE), "POLE");
 
-      XLSX.writeFile(wbOut, `MASTER_POP_UP_${areaInput.value}.xlsx`);
-      status.textContent = "SELESAI ✔ MASTER POP UP TERBENTUK";
+      XLSX.writeFile(wbOut, `MASTER_POP_UP_${areaInput.value || "AREA"}.xlsx`);
+
+      statusMaster.textContent = "SELESAI ✔ MASTER POP UP TERBENTUK";
 
     } catch (e) {
       console.error(e);
-      status.textContent = "ERROR: " + e.message;
+      statusMaster.textContent = "ERROR: " + e.message;
     }
-  });
-
-  // =====================================================
-  // ================== 2️⃣ CSV → KMZ (SCHEMA MODE)
-  // =====================================================
-  function parseCSV(text) {
-    const [h, ...lines] = text.split(/\r?\n/).filter(Boolean);
-    const headers = h.split(";").map(x => x.replace(/^"|"$/g,""));
-    const rows = lines.map(l=>{
-      const o={};
-      l.split(";").forEach((v,i)=>o[headers[i]]=v.replace(/^"|"$/g,""));
-      return o;
-    });
-    return { headers, rows };
-  }
-
-  function indexBy(rows,key){
-    const m=new Map();
-    rows.forEach(r=>m.set(norm(r[key]),r));
-    return m;
-  }
-
-  function patchFolder(doc,path,idx,schemaId){
-    let cur=doc.querySelector("Document");
-    for(const p of path){
-      cur=[...cur.querySelectorAll(":scope>Folder")]
-        .find(f=>norm(f.querySelector("name")?.textContent)===norm(p));
-      if(!cur) return;
-    }
-
-    cur.querySelectorAll("Placemark").forEach(pm=>{
-      const id=norm(pm.querySelector("name")?.textContent);
-      const row=idx.get(id);
-      if(!row) return;
-
-      pm.querySelector("ExtendedData")?.remove();
-      pm.querySelector("description")?.remove();
-
-      const ext=doc.createElement("ExtendedData");
-      const sd=doc.createElement("SchemaData");
-      sd.setAttribute("schemaUrl","#"+schemaId);
-
-      Object.entries(row).forEach(([k,v])=>{
-        const s=doc.createElement("SimpleData");
-        s.setAttribute("name",k.replace(/[^A-Za-z0-9_]/g,"_"));
-        s.textContent=v;
-        sd.appendChild(s);
-      });
-
-      ext.appendChild(sd);
-      pm.appendChild(ext);
-    });
-  }
-
-  btnPatchKmz?.addEventListener("click", async ()=>{
-    statusKmz.textContent="Memproses KMZ...";
-
-    const csvZip=await JSZip.loadAsync(await csvZipInput.files[0].arrayBuffer());
-    const base=Object.keys(csvZip.files).find(f=>f.endsWith(".csv")).split("/")[0]+"/";
-
-    const HOME=parseCSV(await csvZip.file(base+"HOME.csv").async("string"));
-    const HOME_BIZ=parseCSV(await csvZip.file(base+"HOME-BIZ.csv").async("string"));
-    const POLE=parseCSV(await csvZip.file(base+"POLE.csv").async("string"));
-
-    const kmz=await JSZip.loadAsync(await kmzFileInput.files[0].arrayBuffer());
-    const kmlName=Object.keys(kmz.files).find(f=>f.endsWith(".kml"));
-    const doc=new DOMParser().parseFromString(await kmz.file(kmlName).async("string"),"text/xml");
-
-    patchFolder(doc,["DISTRIBUSI","HP","HOME"],indexBy(HOME.rows,"HOMEPASS_ID"),"HOME");
-    patchFolder(doc,["DISTRIBUSI","HP","HOME-BIZ"],indexBy(HOME_BIZ.rows,"HOMEPASS_ID"),"HOME_BIZ");
-    patchFolder(doc,["DISTRIBUSI","POLE"],indexBy(POLE.rows,"Pole ID (New)"),"POLE");
-
-    kmz.file(kmlName,new XMLSerializer().serializeToString(doc));
-    saveAs(await kmz.generateAsync({type:"blob"}),"KMZ_POPUP_FINAL.kmz");
-
-    statusKmz.textContent="SELESAI ✔ POPUP IDENTIK GOOGLE EARTH";
   });
 
 });
